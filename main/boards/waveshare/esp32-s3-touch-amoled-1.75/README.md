@@ -1,15 +1,44 @@
-# Waveshare ESP32-S3-Touch-AMOLED-1.75
+# Waveshare ESP32-S3-Touch-AMOLED-1.75 — Валера
 
+Обычная плата **1.75** (не 1.75C): MCLK GPIO42, BME280 на GPIO16/17.
 
-[ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/esp32-s3-touch-amoled-1.75.htm) ESP32-S3-Touch-AMOLED-1.75 is a high performance, highly integrated microcontroller development board designed by Waveshare.\
-In the smaller form, the 1.75-inch capacitive HD AMOLED screen, highly integrated power management chip, six-axis sensor (three-axis accelerometer and three-axis gyroscope), RTC, low-power audio codec chip and echo cancellation circuit are mounted on the board, which is convenient for development and embedding into the product.
+## Прошивка
 
+```sh
+source /path/to/esp-idf/export.sh
+python3 scripts/build.py waveshare/esp32-s3-touch-amoled-1.75 \
+  --name esp32-s3-touch-amoled-1.75 \
+  --language ru-RU
+```
 
-## images
+Не вызывать `erase_flash`. Прошивка:
 
-| [ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/esp32-s3-touch-amoled-1.75.htm)                                                                                                                                                                                           |
-|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| <img style="width: 150px; height: auto; display: block; margin: 0 auto;" src= "https://www.waveshare.com/media/catalog/product/cache/1/image/800x800/9df78eab33525d08d6e5fb8d27136e95/e/s/esp32-s3-touch-amoled-1.75-1.jpg"> |
-| <img style="width: 150px; height: auto; display: block; margin: 0 auto;" src= "https://www.waveshare.com/media/catalog/product/cache/1/image/560x560/9df78eab33525d08d6e5fb8d27136e95/e/s/esp32-s3-touch-amoled-1.75-b-3.jpg"> |
-| <img style="width: 150px; height: auto; display: block; margin: 0 auto;" src= "https://www.waveshare.com/media/catalog/product/cache/1/image/560x560/9df78eab33525d08d6e5fb8d27136e95/e/s/esp32-s3-touch-amoled-1.75-b-1.jpg"> |
+| образ | адрес |
+| --- | --- |
+| bootloader | 0x0 |
+| partition-table | 0x8000 |
+| app | 0x20000 |
+| assets | 0x800000 |
 
+## Русское пробуждение «Валера»
+
+Выбрано **облачное ухо**: AFE отдаёт очищенный mono PCM → energy gate → Yandex SpeechKit STT `ru-RU` → при тексте со словом «Валера» вызывается обычный `WakeWordInvoke`.
+
+Это не English MultiNet `va le ra` и не переименованный `wn10_ru_privetesp`.
+
+Нужны ключи в NVS (пространство `valera`):
+
+- `api_key` — Yandex Cloud Api-Key
+- `folder_id` — ID каталога
+
+Задать через MCP-инструмент `self.valera.set_yandex_stt` после подключения к xiaozhi.me. Без ключей голосовое пробуждение молчит; **BOOT** (короткое нажатие) остаётся запасным стартом разговора. Длинное нажатие BOOT (~3 с) — сброс Wi-Fi.
+
+Когда Espressif пришлёт настоящий `wn10_ru_valera`, можно переключить на `USE_AFE_WAKE_WORD` + `SR_WN_WN10_RU_VALERA` (см. `wake_models/README.txt`).
+
+## Циферблат
+
+AMOLED 466×466: большие часы, дата, глаза, пилюли «улица» (Open-Meteo, Барнаул) и «комната» (BME280). Часовой пояс — `Asia/Barnaul` в консоли Xiaozhi; `TZ=UTC-7` не ставить.
+
+## Документация платы
+
+[ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/esp32-s3-touch-amoled-1.75.htm)

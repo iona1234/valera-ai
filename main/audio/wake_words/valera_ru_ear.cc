@@ -311,9 +311,10 @@ bool ValeraRuEar::Recognize(const std::vector<int16_t>& pcm, std::string* text) 
 
 bool ValeraRuEar::TextHasValera(const std::string& text) {
     // Match Russian stem «валер» in UTF-8 (covers Валера/Валеру/валера).
+    // Source file is UTF-8; plain literals (not u8"...") stay const char*.
     static const char* kNeedles[] = {
-        u8"валера", u8"Валера", u8"ВАЛЕРА", u8"Валеру", u8"валеру",
-        u8"Валер",  u8"валер",  u8"ВАЛЕР",
+        "валера", "Валера", "ВАЛЕРА", "Валеру", "валеру",
+        "Валер",  "валер",  "ВАЛЕР",
     };
     for (const char* needle : kNeedles) {
         if (text.find(needle) != std::string::npos) {

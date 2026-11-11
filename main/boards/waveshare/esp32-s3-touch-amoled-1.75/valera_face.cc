@@ -14,11 +14,11 @@
 
 namespace {
 
-constexpr lv_color_t kBg = lv_color_hex(0x000000);
-constexpr lv_color_t kCyan = lv_color_hex(0x00E5FF);
-constexpr lv_color_t kMagenta = lv_color_hex(0xFF2BD6);
-constexpr lv_color_t kDim = lv_color_hex(0x1A1A22);
-constexpr lv_color_t kWhite = lv_color_hex(0xF2F2F2);
+const lv_color_t kBg = lv_color_hex(0x000000);
+const lv_color_t kCyan = lv_color_hex(0x00E5FF);
+const lv_color_t kMagenta = lv_color_hex(0xFF2BD6);
+const lv_color_t kDim = lv_color_hex(0x1A1A22);
+const lv_color_t kWhite = lv_color_hex(0xF2F2F2);
 
 // 7-segment bit masks for digits 0-9 (a b c d e f g).
 constexpr uint8_t kSegBits[10] = {

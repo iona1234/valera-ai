@@ -20,24 +20,31 @@ python3 scripts/build.py waveshare/esp32-s3-touch-amoled-1.75 \
 | app | 0x20000 |
 | assets | 0x800000 |
 
-## Русское пробуждение «Валера»
+## Русское пробуждение «Валера» (бесплатно)
 
-Выбрано **облачное ухо**: AFE отдаёт очищенный mono PCM → energy gate → Yandex SpeechKit STT `ru-RU` → при тексте со словом «Валера» вызывается обычный `WakeWordInvoke`.
+Локальный детектор `USE_VALERA_RU_LOCAL_EAR`: AFE mono → MFCC → DTW по вшитым русским TTS-шаблонам «Валера» → `WakeWordInvoke`.
 
-Это не English MultiNet `va le ra` и не переименованный `wn10_ru_privetesp`.
+- Без платного облачного STT и без постоянной отдачи микрофона в облако.
+- Не English MultiNet `va le ra`.
+- Не переименованный `wn10_ru_privetesp`.
+- BOOT (короткое) — аварийный старт разговора; длинное (~3 с) — сброс Wi-Fi.
 
-Нужны ключи в NVS (пространство `valera`):
+Порог DTW и шаблоны могут потребовать подстройки на живом голосе; без проверки на плате успех не утверждается.
 
-- `api_key` — Yandex Cloud Api-Key
-- `folder_id` — ID каталога
+Когда Espressif пришлёт `wn10_ru_valera`, можно перейти на WakeNet (см. `wake_models/README.txt`).
 
-Задать через MCP-инструмент `self.valera.set_yandex_stt` после подключения к xiaozhi.me. Без ключей голосовое пробуждение молчит; **BOOT** (короткое нажатие) остаётся запасным стартом разговора. Длинное нажатие BOOT (~3 с) — сброс Wi-Fi.
+## Циферблат 60 fps
 
-Когда Espressif пришлёт настоящий `wn10_ru_valera`, можно переключить на `USE_AFE_WAKE_WORD` + `SR_WN_WN10_RU_VALERA` (см. `wake_models/README.txt`).
+AMOLED CO5300 QSPI 466×466, штатные драйверы XiaoZhi/Waveshare:
 
-## Циферблат
+- LVGL `timer_period_ms = 16`, лицо тикает каждые 16 ms
+- partial refresh, double buffer в PSRAM, DMA bounce
+- QSPI `pclk` 80 MHz
+- обновляются только грязные виджеты (глаза / двоеточие / пилюли)
 
-AMOLED 466×466: большие часы, дата, глаза, пилюли «улица» (Open-Meteo, Барнаул) и «комната» (BME280). Часовой пояс — `Asia/Barnaul` в консоли Xiaozhi; `TZ=UTC-7` не ставить.
+Аудио остаётся на своём ядре/приоритете и не блокируется отрисовкой.
+
+Часовой пояс — `Asia/Barnaul` в консоли Xiaozhi; `TZ=UTC-7` не ставить.
 
 ## Документация платы
 

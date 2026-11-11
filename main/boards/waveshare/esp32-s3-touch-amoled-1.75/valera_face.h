@@ -3,7 +3,8 @@
 #include "display/lcd_display.h"
 
 // Color watch face on the stock LVGL display. Audio stays on its own task.
-// The 40 ms timer runs on the LVGL thread and must not take DisplayLockGuard.
+// The ~16 ms (60 fps) timer runs on the LVGL thread and must not take
+// DisplayLockGuard. Only dirty widgets are updated each tick.
 class ValeraLcdDisplay : public SpiLcdDisplay {
 public:
     ValeraLcdDisplay(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_handle_t panel_handle,
@@ -52,5 +53,8 @@ private:
     bool caption_dirty_ = false;
     char caption_text_[120] = {};
     int tick_ = 0;
+    int last_hour_ = -1;
+    int last_min_ = -1;
+    bool last_colon_ = false;
     FaceMode mode_ = FaceMode::kIdle;
 };

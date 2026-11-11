@@ -70,7 +70,8 @@ void ValeraLcdDisplay::SetupUI() {
     HideStockChrome();
     BuildFace();
     face_ready_ = true;
-    timer_ = lv_timer_create(TickThunk, 40, this);
+    // 16 ms ≈ 60 fps; LVGL port timer on this board is also 16 ms.
+    timer_ = lv_timer_create(TickThunk, 16, this);
 }
 
 void ValeraLcdDisplay::HideStockChrome() {
@@ -270,10 +271,16 @@ void ValeraLcdDisplay::Tick() {
     }
     struct tm tm_info = {};
     localtime_r(&now, &tm_info);
-    bool colon_on = ((tick_ / 12) % 2) == 0;
-    PaintDigits(&tm_info, colon_on);
+    // ~1 Hz blink at 60 fps.
+    bool colon_on = ((tick_ / 30) % 2) == 0;
+    if (tm_info.tm_hour != last_hour_ || tm_info.tm_min != last_min_ || colon_on != last_colon_) {
+        PaintDigits(&tm_info, colon_on);
+        last_hour_ = tm_info.tm_hour;
+        last_min_ = tm_info.tm_min;
+        last_colon_ = colon_on;
+    }
 
-    if ((tick_ % 25) == 0) {
+    if ((tick_ % 60) == 0) {
         PaintInfo();
     }
 

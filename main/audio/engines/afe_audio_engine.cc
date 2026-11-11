@@ -81,7 +81,7 @@ bool AfeAudioEngine::Initialize(AudioCodec* codec, int frame_duration_ms,
         }
     }
 
-#if CONFIG_USE_VALERA_RU_CLOUD_EAR
+#if CONFIG_USE_VALERA_RU_LOCAL_EAR
     wake_detector_ = WakeDetector::kValeraRuEar;
     valera_ru_ear_ = std::make_unique<ValeraRuEar>();
     valera_ru_ear_->OnWakeWordDetected([this](const std::string& wake_word) {
@@ -93,7 +93,7 @@ bool AfeAudioEngine::Initialize(AudioCodec* codec, int frame_duration_ms,
         }
     });
     if (!valera_ru_ear_->Initialize(codec_, models_)) {
-        ESP_LOGE(TAG, "Failed to initialize Valera Russian cloud ear");
+        ESP_LOGE(TAG, "Failed to initialize Valera local Russian ear");
         valera_ru_ear_.reset();
         wake_detector_ = WakeDetector::kNone;
         return false;

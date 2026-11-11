@@ -11,7 +11,6 @@
 #include "power_save_timer.h"
 #include "axp2101.h"
 #include "i2c_device.h"
-#include "settings.h"
 #include "valera_face.h"
 #include "valera_sensors.h"
 
@@ -241,7 +240,8 @@ private:
         io_config.cs_gpio_num = EXAMPLE_PIN_NUM_LCD_CS;
         io_config.dc_gpio_num = GPIO_NUM_NC;
         io_config.spi_mode = 0;
-        io_config.pclk_hz = 40 * 1000 * 1000;
+        // 80 MHz QSPI helps keep partial LVGL flushes inside a 60 fps budget.
+        io_config.pclk_hz = 80 * 1000 * 1000;
         io_config.trans_queue_depth = 10;
         io_config.lcd_cmd_bits = 32;
         io_config.lcd_param_bits = 8;
@@ -322,18 +322,6 @@ private:
             "Текущая погода Барнаула (улица) и показания комнатного BME280, если он подключён.",
             PropertyList(),
             [](const PropertyList& properties) -> ReturnValue { return ValeraSensors::Describe(); });
-        mcp_server.AddTool(
-            "self.valera.set_yandex_stt",
-            "Сохранить ключ Yandex SpeechKit для русского пробуждения «Валера». "
-            "Параметры: api_key (Api-Key), folder_id (каталог облака).",
-            PropertyList({Property("api_key", kPropertyTypeString),
-                          Property("folder_id", kPropertyTypeString)}),
-            [](const PropertyList& properties) -> ReturnValue {
-                Settings settings("valera", true);
-                settings.SetString("api_key", properties["api_key"].value<std::string>());
-                settings.SetString("folder_id", properties["folder_id"].value<std::string>());
-                return std::string("Yandex STT credentials saved to NVS (valera/*)");
-            });
 #endif
     }
 

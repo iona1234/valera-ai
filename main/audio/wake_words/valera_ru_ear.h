@@ -17,8 +17,8 @@
 #include <freertos/queue.h>
 #include <freertos/task.h>
 
-// Russian cloud ear: AFE mono PCM → Yandex SpeechKit STT (ru-RU) → WakeWordInvoke.
-// Not English MultiNet. Not a renamed «Привет ESP» WakeNet.
+// Free on-device Russian wake: AFE mono → MFCC + DTW vs Russian «Валера» templates.
+// Not English MultiNet. Not Yandex. Not a renamed «Привет ESP» WakeNet.
 class ValeraRuEar : public WakeWord {
 public:
     ValeraRuEar();
@@ -45,9 +45,7 @@ private:
     static void WorkerThunk(void* arg);
     void WorkerLoop();
     void FeedSamples(const int16_t* data, size_t samples);
-    bool CredentialsReady(std::string* api_key, std::string* folder_id) const;
-    bool Recognize(const std::vector<int16_t>& pcm, std::string* text);
-    static bool TextHasValera(const std::string& text);
+    bool MatchValera(const std::vector<int16_t>& pcm, float* best_score);
     static int FrameRms(const int16_t* data, size_t samples);
 
     AudioCodec* codec_ = nullptr;
@@ -72,8 +70,6 @@ private:
     std::deque<std::vector<uint8_t>> wake_word_opus_;
     std::mutex wake_word_mutex_;
     std::condition_variable wake_word_cv_;
-
-    bool missing_creds_logged_ = false;
 };
 
 #endif

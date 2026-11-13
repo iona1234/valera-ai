@@ -422,7 +422,7 @@ void ValeraLcdDisplay::Tick() {
 
     time_t now = time(nullptr);
     ValeraClimate climate = ValeraSensors::Get();
-    if (climate.clock_offset_ok) now += climate.clock_offset_sec;
+    if (climate.clock_fix_ok) now += climate.clock_fix_sec;
     struct tm tm_info = {};
     localtime_r(&now, &tm_info);
 
@@ -661,7 +661,7 @@ void ValeraLcdDisplay::PaintDigits(const struct tm* tm, bool colon_on) {
             lv_obj_set_style_bg_opa(seg_[d][s], lit ? LV_OPA_COVER : LV_OPA_30, 0);
         }
     }
-    const lv_opa_t colon_opa = colon_on ? LV_OPA_COVER : LV_OPA_25;
+    const lv_opa_t colon_opa = colon_on ? LV_OPA_COVER : LV_OPA_20;
     lv_obj_set_style_bg_opa(colon_[0], colon_opa, 0);
     lv_obj_set_style_bg_opa(colon_[1], colon_opa, 0);
 }
@@ -669,7 +669,7 @@ void ValeraLcdDisplay::PaintDigits(const struct tm* tm, bool colon_on) {
 void ValeraLcdDisplay::PaintInfo() {
     time_t now = time(nullptr);
     ValeraClimate c = ValeraSensors::Get();
-    if (c.clock_offset_ok) now += c.clock_offset_sec;
+    if (c.clock_fix_ok) now += c.clock_fix_sec;
     struct tm tm_info = {};
     localtime_r(&now, &tm_info);
 

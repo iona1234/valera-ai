@@ -2,9 +2,9 @@
 
 #include "display/lcd_display.h"
 
-// Color watch face on the stock LVGL display. Audio stays on its own task.
-// The ~16 ms (60 fps) timer runs on the LVGL thread and must not take
-// DisplayLockGuard. Only dirty widgets are updated each tick.
+// Round AMOLED face: large 7-seg clock + expressive oval eyes.
+// No tiny labels. Layout is centered on 466x466. 16 ms LVGL timer;
+// never take DisplayLockGuard from the timer callback.
 class ValeraLcdDisplay : public SpiLcdDisplay {
 public:
     ValeraLcdDisplay(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_handle_t panel_handle,
@@ -27,60 +27,69 @@ public:
 private:
     enum class FaceMode { kIdle, kListen, kSpeak, kThink, kWifi, kSleep };
 
+    struct Eye {
+        lv_obj_t* socket = nullptr;
+        lv_obj_t* sclera = nullptr;
+        lv_obj_t* iris_outer = nullptr;
+        lv_obj_t* iris_inner = nullptr;
+        lv_obj_t* pupil = nullptr;
+        lv_obj_t* shine_big = nullptr;
+        lv_obj_t* shine_small = nullptr;
+        lv_obj_t* lid_top = nullptr;
+        lv_obj_t* lid_bot = nullptr;
+        lv_obj_t* halo = nullptr;
+        int16_t cx = 0;
+        int16_t cy = 0;
+    };
+
     static void TickThunk(lv_timer_t* timer);
     void Tick();
     void BuildFace();
+    void BuildEye(Eye* eye, int16_t cx, int16_t cy);
     void ApplyMode(FaceMode mode);
     void PaintDigits(const struct tm* tm, bool colon_on);
-    void PaintInfo();
     void HideStockChrome();
+    void AnimateAmbient();
     void AnimateEyes();
     void AnimateBars();
-    void AnimateAmbient();
-    void AnimateOrbits();
-    void SetModeChip(const char* text, lv_color_t color);
+    void PickGazeTarget();
+    void PlaceIris(Eye* eye, float look_x, float look_y);
+    void PlaceLids(Eye* eye, float close_amount);
 
     lv_obj_t* root_ = nullptr;
-    lv_obj_t* bezel_outer_ = nullptr;
-    lv_obj_t* bezel_inner_ = nullptr;
-    lv_obj_t* bezel_dot_[12] = {};
-    lv_obj_t* glow_ring_ = nullptr;
-    lv_obj_t* halo_[2] = {};
-    lv_obj_t* halo_outer_[2] = {};
+    lv_obj_t* bezel_ = nullptr;
+    lv_obj_t* glow_ = nullptr;
     lv_obj_t* seg_[4][7] = {};
     lv_obj_t* colon_[2] = {};
-    lv_obj_t* eye_socket_[2] = {};
-    lv_obj_t* eye_[2] = {};
-    lv_obj_t* iris_[2] = {};
-    lv_obj_t* pupil_[2] = {};
-    lv_obj_t* shine_[2] = {};
-    lv_obj_t* shine2_[2] = {};
-    lv_obj_t* lid_[2] = {};
-    lv_obj_t* lid_bot_[2] = {};
-    lv_obj_t* orbit_[6] = {};
-    lv_obj_t* date_label_ = nullptr;
-    lv_obj_t* mode_chip_ = nullptr;
-    lv_obj_t* out_pill_ = nullptr;
-    lv_obj_t* room_pill_ = nullptr;
-    lv_obj_t* out_dot_ = nullptr;
-    lv_obj_t* room_dot_ = nullptr;
-    lv_obj_t* out_label_ = nullptr;
-    lv_obj_t* room_label_ = nullptr;
-    lv_obj_t* caption_ = nullptr;
-    lv_obj_t* bars_[12] = {};
+    Eye left_{};
+    Eye right_{};
+    lv_obj_t* mouth_ = nullptr;
+    lv_obj_t* bars_[8] = {};
     lv_timer_t* timer_ = nullptr;
 
     bool face_ready_ = false;
     bool sleepy_ = false;
-    bool caption_dirty_ = false;
-    char caption_text_[120] = {};
     int tick_ = 0;
     int last_hour_ = -1;
     int last_min_ = -1;
     bool last_colon_ = false;
-    int last_eye_h_ = -1;
-    int last_look_x_ = 999;
-    int last_look_y_ = 999;
-    int last_iris_ = -1;
     FaceMode mode_ = FaceMode::kIdle;
+
+    // Eye geometry (filled in BuildFace from screen size).
+    int16_t eye_rx_ = 72;
+    int16_t eye_ry_ = 60;
+    int16_t iris_r_ = 40;
+    int16_t pupil_r_ = 18;
+    int16_t eye_cy_ = 300;
+
+    float look_x_ = 0.f;
+    float look_y_ = 0.f;
+    float target_x_ = 0.f;
+    float target_y_ = 0.f;
+    int next_gaze_tick_ = 90;
+    int next_blink_tick_ = 120;
+    int blink_phase_ = 0;  // 0 idle, 1 closing, 2 opening
+    int blink_tick_ = 0;
+    float blink_ = 0.f;
+    float squint_ = 0.f;
 };

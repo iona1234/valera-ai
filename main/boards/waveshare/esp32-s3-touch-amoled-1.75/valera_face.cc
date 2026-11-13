@@ -205,16 +205,16 @@ void ValeraLcdDisplay::BuildFace() {
     lv_obj_set_style_border_color(bezel_, kCyanDeep, 0);
     lv_obj_set_style_border_opa(bezel_, LV_OPA_60, 0);
 
-    // Geometry scaled to the round panel.
-    eye_rx_ = (int16_t)(min_side * 0.155f);
-    if (eye_rx_ < 64) eye_rx_ = 64;
-    eye_ry_ = (int16_t)(eye_rx_ * 0.82f);
-    iris_r_ = (int16_t)(eye_rx_ * 0.56f);
-    pupil_r_ = (int16_t)(eye_rx_ * 0.28f);
+    // Geometry scaled to the round panel — eyes are the hero under the clock.
+    eye_rx_ = (int16_t)(min_side * 0.178f);
+    if (eye_rx_ < 72) eye_rx_ = 72;
+    eye_ry_ = (int16_t)(eye_rx_ * 0.78f);  // slightly wider capsule
+    iris_r_ = (int16_t)(eye_rx_ * 0.55f);
+    pupil_r_ = (int16_t)(eye_rx_ * 0.27f);
 
     // Clock in the upper third — large, centered, no labels.
-    const int digit_w = (int)(min_side * 0.145f);
-    const int digit_h = (int)(min_side * 0.235f);
+    const int digit_w = (int)(min_side * 0.138f);
+    const int digit_h = (int)(min_side * 0.220f);
     const int thick = (int)(digit_w * 0.16f);
     const int gap = (int)(digit_w * 0.12f);
     const int colon_gap = (int)(digit_w * 0.28f);
@@ -253,8 +253,8 @@ void ValeraLcdDisplay::BuildFace() {
     lv_obj_set_style_radius(colon_[1], LV_RADIUS_CIRCLE, 0);
 
     // Eyes centered under the clock, symmetric about vertical axis.
-    const int16_t gap_eyes = (int16_t)(eye_rx_ * 0.42f);
-    eye_cy_ = (int16_t)(origin_y + digit_h + eye_ry_ + min_side * 0.06f);
+    const int16_t gap_eyes = (int16_t)(eye_rx_ * 0.36f);
+    eye_cy_ = (int16_t)(origin_y + digit_h + eye_ry_ + min_side * 0.045f);
     const int16_t left_cx = (int16_t)(cx - eye_rx_ - gap_eyes);
     const int16_t right_cx = (int16_t)(cx + eye_rx_ + gap_eyes);
     BuildEye(&left_, left_cx, eye_cy_);

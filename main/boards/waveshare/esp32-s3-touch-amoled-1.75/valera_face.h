@@ -37,11 +37,16 @@ private:
     void AnimateEyes();
     void AnimateBars();
     void AnimateAmbient();
+    void AnimateOrbits();
     void SetModeChip(const char* text, lv_color_t color);
 
     lv_obj_t* root_ = nullptr;
-    lv_obj_t* bezel_ring_ = nullptr;
+    lv_obj_t* bezel_outer_ = nullptr;
+    lv_obj_t* bezel_inner_ = nullptr;
+    lv_obj_t* bezel_dot_[12] = {};
+    lv_obj_t* glow_ring_ = nullptr;
     lv_obj_t* halo_[2] = {};
+    lv_obj_t* halo_outer_[2] = {};
     lv_obj_t* seg_[4][7] = {};
     lv_obj_t* colon_[2] = {};
     lv_obj_t* eye_socket_[2] = {};
@@ -49,8 +54,10 @@ private:
     lv_obj_t* iris_[2] = {};
     lv_obj_t* pupil_[2] = {};
     lv_obj_t* shine_[2] = {};
+    lv_obj_t* shine2_[2] = {};
     lv_obj_t* lid_[2] = {};
-    lv_obj_t* brand_ = nullptr;
+    lv_obj_t* lid_bot_[2] = {};
+    lv_obj_t* orbit_[6] = {};
     lv_obj_t* date_label_ = nullptr;
     lv_obj_t* mode_chip_ = nullptr;
     lv_obj_t* out_pill_ = nullptr;
@@ -60,7 +67,7 @@ private:
     lv_obj_t* out_label_ = nullptr;
     lv_obj_t* room_label_ = nullptr;
     lv_obj_t* caption_ = nullptr;
-    lv_obj_t* bars_[9] = {};
+    lv_obj_t* bars_[12] = {};
     lv_timer_t* timer_ = nullptr;
 
     bool face_ready_ = false;

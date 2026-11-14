@@ -11,6 +11,8 @@
 #include "power_save_timer.h"
 #include "axp2101.h"
 #include "i2c_device.h"
+#include "valera_face.h"
+#include "valera_sensors.h"
 
 #include <esp_log.h>
 #include <esp_lcd_panel_vendor.h>
@@ -146,7 +148,7 @@ private:
     i2c_master_bus_handle_t i2c_bus_;
     Pmic* pmic_ = nullptr;
     Button boot_button_;
-    CustomLcdDisplay* display_;
+    ValeraLcdDisplay* display_;
     CustomBacklight* backlight_;
     esp_io_expander_handle_t io_expander = NULL;
     PowerSaveTimer* power_save_timer_;
@@ -213,6 +215,11 @@ private:
             app.ToggleChatState();
         });
 
+        boot_button_.OnLongPress([this]() {
+            ESP_LOGI(TAG, "BOOT long press: Wi-Fi reconfigure");
+            EnterWifiConfigMode();
+        });
+
 #if CONFIG_USE_DEVICE_AEC
         boot_button_.OnDoubleClick([this]() {
             auto& app = Application::GetInstance();
@@ -233,7 +240,8 @@ private:
         io_config.cs_gpio_num = EXAMPLE_PIN_NUM_LCD_CS;
         io_config.dc_gpio_num = GPIO_NUM_NC;
         io_config.spi_mode = 0;
-        io_config.pclk_hz = 40 * 1000 * 1000;
+        // 80 MHz QSPI helps keep partial LVGL flushes inside a 60 fps budget.
+        io_config.pclk_hz = 80 * 1000 * 1000;
         io_config.trans_queue_depth = 10;
         io_config.lcd_cmd_bits = 32;
         io_config.lcd_param_bits = 8;
@@ -261,7 +269,7 @@ private:
         esp_lcd_panel_invert_color(panel, false);
         esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
         esp_lcd_panel_disp_on_off(panel, true);
-        display_ = new CustomLcdDisplay(panel_io, panel,
+        display_ = new ValeraLcdDisplay(panel_io, panel,
                                         DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
         backlight_ = new CustomBacklight(panel_io);
         backlight_->RestoreBrightness();
@@ -308,10 +316,17 @@ private:
                 EnterWifiConfigMode();
                 return true;
             });
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+        mcp_server.AddTool(
+            "self.valera.climate",
+            "Текущая погода Барнаула (улица) и показания комнатного BME280, если он подключён.",
+            PropertyList(),
+            [](const PropertyList& properties) -> ReturnValue { return ValeraSensors::Describe(); });
+#endif
     }
 
 public:
-    WaveshareEsp32s3TouchAMOLED1inch75() : boot_button_(BOOT_BUTTON_GPIO) {
+    WaveshareEsp32s3TouchAMOLED1inch75() : boot_button_(BOOT_BUTTON_GPIO, false, 3000) {
         InitializePowerSaveTimer();
         InitializeCodecI2c();
 #if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
@@ -323,6 +338,9 @@ public:
         InitializeTouch();
         InitializeButtons();
         InitializeTools();
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+        ValeraSensors::Start();
+#endif
     }
 
     virtual AudioCodec* GetAudioCodec() override {

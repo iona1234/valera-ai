@@ -1,15 +1,51 @@
-# Waveshare ESP32-S3-Touch-AMOLED-1.75
+# Waveshare ESP32-S3-Touch-AMOLED-1.75 — Валера
 
+Обычная плата **1.75** (не 1.75C): MCLK GPIO42, BME280 на GPIO16/17.
 
-[ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/esp32-s3-touch-amoled-1.75.htm) ESP32-S3-Touch-AMOLED-1.75 is a high performance, highly integrated microcontroller development board designed by Waveshare.\
-In the smaller form, the 1.75-inch capacitive HD AMOLED screen, highly integrated power management chip, six-axis sensor (three-axis accelerometer and three-axis gyroscope), RTC, low-power audio codec chip and echo cancellation circuit are mounted on the board, which is convenient for development and embedding into the product.
+## Прошивка
 
+```sh
+source /path/to/esp-idf/export.sh
+python3 scripts/build.py waveshare/esp32-s3-touch-amoled-1.75 \
+  --name esp32-s3-touch-amoled-1.75 \
+  --language ru-RU
+```
 
-## images
+Не вызывать `erase_flash`. Прошивка:
 
-| [ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/esp32-s3-touch-amoled-1.75.htm)                                                                                                                                                                                           |
-|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| <img style="width: 150px; height: auto; display: block; margin: 0 auto;" src= "https://www.waveshare.com/media/catalog/product/cache/1/image/800x800/9df78eab33525d08d6e5fb8d27136e95/e/s/esp32-s3-touch-amoled-1.75-1.jpg"> |
-| <img style="width: 150px; height: auto; display: block; margin: 0 auto;" src= "https://www.waveshare.com/media/catalog/product/cache/1/image/560x560/9df78eab33525d08d6e5fb8d27136e95/e/s/esp32-s3-touch-amoled-1.75-b-3.jpg"> |
-| <img style="width: 150px; height: auto; display: block; margin: 0 auto;" src= "https://www.waveshare.com/media/catalog/product/cache/1/image/560x560/9df78eab33525d08d6e5fb8d27136e95/e/s/esp32-s3-touch-amoled-1.75-b-1.jpg"> |
+| образ | адрес |
+| --- | --- |
+| bootloader | 0x0 |
+| partition-table | 0x8000 |
+| app | 0x20000 |
+| assets | 0x800000 |
 
+## Русское пробуждение «Валера» (бесплатно)
+
+Локальный детектор `USE_VALERA_RU_LOCAL_EAR`: AFE mono → MFCC → DTW по вшитым русским TTS-шаблонам «Валера» → `WakeWordInvoke`.
+
+- Без платного облачного STT и без постоянной отдачи микрофона в облако.
+- Не English MultiNet `va le ra`.
+- Не переименованный `wn10_ru_privetesp`.
+- BOOT (короткое) — аварийный старт разговора; длинное (~3 с) — сброс Wi-Fi.
+
+Порог DTW и шаблоны могут потребовать подстройки на живом голосе; без проверки на плате успех не утверждается.
+
+Когда Espressif пришлёт `wn10_ru_valera`, можно перейти на WakeNet (см. `wake_models/README.txt`).
+
+## Циферблат 60 fps
+
+AMOLED CO5300 QSPI 466×466, штатные драйверы XiaoZhi/Waveshare:
+
+- LVGL `timer_period_ms = 16`, лицо тикает каждые 16 ms
+- partial refresh, double buffer в PSRAM, DMA bounce
+- QSPI `pclk` 80 MHz
+- обновляются только грязные виджеты (глаза / двоеточие / пилюли)
+
+Аудио остаётся на своём ядре/приоритете и не блокируется отрисовкой.
+
+Часовой пояс — `Asia/Barnaul` в консоли Xiaozhi; `TZ=UTC-7` не ставить.
+
+## Документация платы
+
+[ESP32-S3-Touch-AMOLED-1.75](https://www.waveshare.com/esp32-s3-touch-amoled-1.75.htm)

@@ -355,6 +355,7 @@ def _wake_word_sdkconfig_options(
         "CONFIG_USE_ESP_WAKE_WORD=n",
         "CONFIG_USE_AFE_WAKE_WORD=n",
         "CONFIG_USE_CUSTOM_WAKE_WORD=n",
+        "CONFIG_USE_VALERA_RU_LOCAL_EAR=n",
     ])
 
     if normalized == "disabled":

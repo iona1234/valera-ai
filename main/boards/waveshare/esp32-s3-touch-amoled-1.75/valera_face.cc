@@ -589,9 +589,12 @@ void ValeraLcdDisplay::SetActiveMode(ActiveMode mode) {
 void ValeraLcdDisplay::AnimateAmbient() {
     const float breath = 0.5f + 0.5f * sinf(tick_ * 0.025f);
     lv_color_t rim = kCyanDim;
+    lv_opa_t rim_opa = (lv_opa_t)(24 + (int)(40 * breath));
     if (assistant_active_) {
-        if (InReplyStage()) rim = kMagenta;
-        else if (active_mode_ == ActiveMode::kListen) rim = kCyan;
+        if (InReplyStage()) {
+            rim = kMagentaDim;
+            rim_opa = (lv_opa_t)(8 + (int)(18 * breath));  // almost gone around text
+        } else if (active_mode_ == ActiveMode::kListen) rim = kCyan;
         else if (active_mode_ == ActiveMode::kSpeak) rim = kMagenta;
         else if (active_mode_ == ActiveMode::kThink) rim = kThink;
         else if (active_mode_ == ActiveMode::kWifi) rim = ((tick_ / 28) % 2) ? kCyan : kMagenta;
@@ -599,7 +602,7 @@ void ValeraLcdDisplay::AnimateAmbient() {
         rim = ((tick_ / 40) % 2) ? kCyanDim : kMagentaDim;
     }
     lv_obj_set_style_border_color(bezel_, rim, 0);
-    lv_obj_set_style_border_opa(bezel_, (lv_opa_t)(24 + (int)(40 * breath)), 0);
+    lv_obj_set_style_border_opa(bezel_, rim_opa, 0);
 }
 
 void ValeraLcdDisplay::AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, int16_t pupil_r,
@@ -724,25 +727,23 @@ void ValeraLcdDisplay::AnimateSpectrum() {
 }
 
 void ValeraLcdDisplay::AnimateReplyFx() {
+    // No ring/frame around the text — only sparse edge orbs for AMOLED life.
+    if (reply_ring_) lv_obj_set_style_border_opa(reply_ring_, LV_OPA_TRANSP, 0);
+    if (reply_ring2_) lv_obj_set_style_border_opa(reply_ring2_, LV_OPA_TRANSP, 0);
+
     const float cx = LV_HOR_RES * 0.5f;
     const float cy = LV_VER_RES * 0.5f;
-    const float breath = 0.5f + 0.5f * sinf(tick_ * 0.028f);
-    lv_obj_set_style_border_opa(reply_ring_, (lv_opa_t)(12 + (int)(34 * breath)), 0);
-    lv_obj_set_style_border_color(reply_ring_, kMagentaDim, 0);
-    lv_obj_set_style_border_opa(reply_ring2_, (lv_opa_t)(10 + (int)(28 * (1.f - breath))), 0);
-    lv_obj_set_style_border_color(reply_ring2_, kCyanDim, 0);
-
-    const float R = LV_HOR_RES * 0.38f;
+    const float R = LV_HOR_RES * 0.42f;
     for (int i = 0; i < 6; ++i) {
-        const float a = tick_ * (0.012f + i * 0.002f) + i * 1.1f;
-        const float rx = R * (0.62f + 0.18f * (i % 2));
-        const float ry = R * (0.55f + 0.15f * ((i + 1) % 2));
-        const int sz = (i % 2) ? 12 : 18;
+        const float a = tick_ * (0.010f + i * 0.0016f) + i * 1.05f;
+        const float rx = R * (0.78f + 0.08f * (i % 2));
+        const float ry = R * (0.78f + 0.08f * ((i + 1) % 2));
+        const int sz = (i % 2) ? 10 : 16;
         const int x = (int)(cx + rx * cosf(a));
-        const int y = (int)(cy + ry * sinf(a * 0.9f));
+        const int y = (int)(cy + ry * sinf(a * 0.92f));
         lv_obj_set_pos(reply_orb_[i], x - sz / 2, y - sz / 2);
-        const float tw = 0.35f + 0.65f * fabsf(sinf(tick_ * 0.035f + i));
-        lv_obj_set_style_bg_opa(reply_orb_[i], (lv_opa_t)(20 + (int)(110 * tw)), 0);
+        const float tw = 0.30f + 0.70f * fabsf(sinf(tick_ * 0.03f + i));
+        lv_obj_set_style_bg_opa(reply_orb_[i], (lv_opa_t)(16 + (int)(90 * tw)), 0);
     }
 }
 

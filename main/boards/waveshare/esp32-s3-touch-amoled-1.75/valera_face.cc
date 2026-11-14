@@ -2,6 +2,7 @@
 
 #include "application.h"
 #include "device_state.h"
+#include "display/lvgl_display/lvgl_theme.h"
 #include "valera_sensors.h"
 
 #include <cmath>
@@ -24,6 +25,7 @@ const lv_color_t kPupil = lv_color_hex(0x0A0C10);
 const lv_color_t kWhite = lv_color_hex(0xFFFFFF);
 const lv_color_t kSun = lv_color_hex(0xFFD36A);
 const lv_color_t kCloud = lv_color_hex(0xC8D6E5);
+const lv_color_t kCaptionBg = lv_color_hex(0x0A1218);
 
 constexpr uint8_t kSegBits[10] = {
     0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F,
@@ -194,7 +196,7 @@ void ValeraLcdDisplay::BuildFace() {
     lv_obj_set_style_border_color(bezel_, kCyanDim, 0);
     lv_obj_set_style_border_opa(bezel_, LV_OPA_50, 0);
 
-    // ── Clock page: fat digits, optical center of the circle ─────────────
+    // Clock: fat digits, optical center of the circle.
     const int c_dw = (int)(min_side * 0.155f);
     const int c_dh = (int)(min_side * 0.28f);
     const int c_th = (int)(c_dw * 0.22f);
@@ -202,7 +204,7 @@ void ValeraLcdDisplay::BuildFace() {
     const int c_cgap = (int)(c_dw * 0.34f);
     const int c_total = c_dw * 4 + c_gap * 3 + c_cgap;
     const int c_ox = (W - c_total) / 2;
-    const int c_oy = (H - c_dh) / 2;  // true vertical center
+    const int c_oy = (H - c_dh) / 2;
     int cxs[4];
     cxs[0] = c_ox;
     cxs[1] = c_ox + c_dw + c_gap;
@@ -221,7 +223,7 @@ void ValeraLcdDisplay::BuildFace() {
         Track(clock_objs_, &clock_obj_n_, 30, clock_colon_[i]);
     }
 
-    // ── Weather page: glyph + outdoor 7-seg + room 7-seg, centered ───────
+    // Weather: glyph + outdoor 7-seg + room 7-seg.
     weather_glyph_ = MakePlain(root_);
     lv_obj_set_size(weather_glyph_, 56, 56);
     lv_obj_set_pos(weather_glyph_, cx - 28, cy - 130);
@@ -234,7 +236,6 @@ void ValeraLcdDisplay::BuildFace() {
     const int w_dh = (int)(min_side * 0.24f);
     const int w_th = (int)(w_dw * 0.22f);
     const int w_gap = (int)(w_dw * 0.14f);
-    // outdoor: optional minus + 2 digits + degree dot
     const int out_total = w_th + 8 + w_dw * 2 + w_gap + 18;
     const int out_ox = (W - out_total) / 2;
     const int out_oy = cy - w_dh / 2 - 10;
@@ -243,9 +244,7 @@ void ValeraLcdDisplay::BuildFace() {
     BuildDigit(root_, weather_out_seg_[0], out_ox + w_th + 8, out_oy, w_dw, w_dh, w_th);
     BuildDigit(root_, weather_out_seg_[1], out_ox + w_th + 8 + w_dw + w_gap, out_oy, w_dw, w_dh,
                w_th);
-    // unused third digit slot kept for API symmetry
-    BuildDigit(root_, weather_out_seg_[2], -100, -100, w_dw, w_dh, w_th);
-    for (int d = 0; d < 3; ++d)
+    for (int d = 0; d < 2; ++d)
         for (int s = 0; s < 7; ++s) Track(weather_objs_, &weather_obj_n_, 40, weather_out_seg_[d][s]);
     weather_out_dot_ = MakePlain(root_);
     lv_obj_set_size(weather_out_dot_, 14, 14);
@@ -275,7 +274,7 @@ void ValeraLcdDisplay::BuildFace() {
     lv_obj_set_style_bg_opa(weather_room_dot_, LV_OPA_COVER, 0);
     Track(weather_objs_, &weather_obj_n_, 40, weather_room_dot_);
 
-    // ── Play / Sber-like screensaver: big centered eyes + floating orbs ──
+    // Play screensaver: Sber-like centered eyes + orbs.
     play_eye_w_ = (int16_t)(min_side * 0.24f);
     play_eye_h_ = (int16_t)(play_eye_w_ * 0.62f);
     play_pupil_r_ = (int16_t)(play_eye_h_ * 0.30f);
@@ -308,20 +307,20 @@ void ValeraLcdDisplay::BuildFace() {
         Track(play_objs_, &play_obj_n_, 20, play_orb_[i]);
     }
 
-    // ── Active assistant: eyes upper, spectrum lower ─────────────────────
+    // Active assistant: eyes top, spectrum mid, 宗主-style caption bottom.
     act_eye_w_ = (int16_t)(min_side * 0.20f);
     act_eye_h_ = (int16_t)(act_eye_w_ * 0.62f);
     act_pupil_r_ = (int16_t)(act_eye_h_ * 0.30f);
-    act_eye_cy_ = (int16_t)(min_side * 0.30f);
+    act_eye_cy_ = (int16_t)(min_side * 0.28f);
     const int16_t act_gap = (int16_t)(act_eye_w_ * 0.32f);
     BuildEye(&act_left_, (int16_t)(cx - act_eye_w_ / 2 - act_gap), act_eye_cy_, act_eye_w_,
              act_eye_h_, act_pupil_r_);
     BuildEye(&act_right_, (int16_t)(cx + act_eye_w_ / 2 + act_gap), act_eye_cy_, act_eye_w_,
              act_eye_h_, act_pupil_r_);
-    Track(active_objs_, &active_obj_n_, 30, act_left_.body);
-    Track(active_objs_, &active_obj_n_, 30, act_right_.body);
+    Track(active_objs_, &active_obj_n_, 40, act_left_.body);
+    Track(active_objs_, &active_obj_n_, 40, act_right_.body);
 
-    spectrum_base_y_ = (int16_t)(min_side * 0.72f);
+    spectrum_base_y_ = (int16_t)(min_side * 0.58f);
     for (int i = 0; i < 14; ++i) {
         spectrum_[i] = MakePlain(root_);
         lv_obj_set_size(spectrum_[i], 12, 20);
@@ -329,10 +328,43 @@ void ValeraLcdDisplay::BuildFace() {
         lv_obj_set_style_radius(spectrum_[i], 6, 0);
         lv_obj_set_style_bg_color(spectrum_[i], kCyan, 0);
         lv_obj_set_style_bg_opa(spectrum_[i], LV_OPA_COVER, 0);
-        Track(active_objs_, &active_obj_n_, 30, spectrum_[i]);
+        Track(active_objs_, &active_obj_n_, 40, spectrum_[i]);
     }
 
-    // Start on clock; hide other pages.
+    // Caption pill stays outside active_objs_ so spectrum/caption toggle independently.
+    auto* lvgl_theme = static_cast<LvglTheme*>(current_theme_);
+    const lv_font_t* text_font =
+        (lvgl_theme && lvgl_theme->text_font()) ? lvgl_theme->text_font()->font() : nullptr;
+    const int line_h = text_font ? text_font->line_height : 22;
+    const int pill_w = (int)(min_side * 0.72f);
+    const int pill_h = line_h + 16;
+    caption_pill_ = MakePlain(root_);
+    lv_obj_set_size(caption_pill_, pill_w, pill_h);
+    lv_obj_set_pos(caption_pill_, (W - pill_w) / 2, (int)(min_side * 0.78f));
+    lv_obj_set_style_radius(caption_pill_, pill_h / 2, 0);
+    lv_obj_set_style_bg_color(caption_pill_, kCaptionBg, 0);
+    lv_obj_set_style_bg_opa(caption_pill_, LV_OPA_80, 0);
+    lv_obj_set_style_pad_left(caption_pill_, 14, 0);
+    lv_obj_set_style_pad_right(caption_pill_, 14, 0);
+    lv_obj_add_flag(caption_pill_, LV_OBJ_FLAG_HIDDEN);
+
+    caption_label_ = lv_label_create(caption_pill_);
+    lv_label_set_text(caption_label_, "");
+    lv_obj_set_width(caption_label_, pill_w - 28);
+    lv_label_set_long_mode(caption_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_style_text_align(caption_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_color(caption_label_, kWhite, 0);
+    if (text_font) lv_obj_set_style_text_font(caption_label_, text_font, 0);
+    lv_obj_align(caption_label_, LV_ALIGN_CENTER, 0, 0);
+    static lv_anim_t caption_anim;
+    lv_anim_init(&caption_anim);
+    lv_anim_set_delay(&caption_anim, 800);
+    lv_anim_set_repeat_count(&caption_anim, LV_ANIM_REPEAT_INFINITE);
+    lv_obj_set_style_anim(caption_label_, &caption_anim, LV_PART_MAIN);
+    lv_obj_set_style_anim_duration(caption_label_, lv_anim_speed_clamped(50, 300, 60000),
+                                   LV_PART_MAIN);
+
+    idle_step_ = 0;
     ShowIdlePage(IdlePage::kClock);
     SetGroupHidden(active_objs_, active_obj_n_, true);
     PickGazeTarget(play_eye_w_ * 0.18f, play_eye_h_ * 0.16f);
@@ -371,9 +403,11 @@ void ValeraLcdDisplay::ShowIdlePage(IdlePage page) {
 }
 
 void ValeraLcdDisplay::AdvanceIdlePage() {
-    if (idle_page_ == IdlePage::kClock) ShowIdlePage(IdlePage::kWeather);
-    else if (idle_page_ == IdlePage::kWeather) ShowIdlePage(IdlePage::kPlay);
-    else ShowIdlePage(IdlePage::kClock);
+    // Default product loop: clock <-> weather, play every other weather visit.
+    static const IdlePage kSeq[] = {IdlePage::kClock, IdlePage::kWeather, IdlePage::kClock,
+                                    IdlePage::kWeather, IdlePage::kPlay};
+    idle_step_ = (idle_step_ + 1) % 5;
+    ShowIdlePage(kSeq[idle_step_]);
 }
 
 void ValeraLcdDisplay::LayoutForActive(bool active) {
@@ -383,10 +417,33 @@ void ValeraLcdDisplay::LayoutForActive(bool active) {
         SetGroupHidden(weather_objs_, weather_obj_n_, true);
         SetGroupHidden(play_objs_, play_obj_n_, true);
         SetGroupHidden(active_objs_, active_obj_n_, false);
+        SyncActiveBottom();
     } else {
         SetGroupHidden(active_objs_, active_obj_n_, true);
-        ShowIdlePage(idle_page_);
+        if (caption_pill_) lv_obj_add_flag(caption_pill_, LV_OBJ_FLAG_HIDDEN);
+        idle_step_ = 0;
+        ShowIdlePage(IdlePage::kClock);
     }
+}
+
+void ValeraLcdDisplay::SyncActiveBottom() {
+    if (!assistant_active_) {
+        if (caption_pill_) lv_obj_add_flag(caption_pill_, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    const bool show_cap = has_caption_ && !hide_subtitle_;
+    if (caption_pill_) {
+        if (show_cap) lv_obj_clear_flag(caption_pill_, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(caption_pill_, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void ValeraLcdDisplay::ApplyCaption() {
+    if (!caption_label_) return;
+    lv_anim_delete(caption_label_, nullptr);
+    lv_label_set_text(caption_label_, caption_text_);
+    has_caption_ = caption_text_[0] != '\0';
+    SyncActiveBottom();
 }
 
 void ValeraLcdDisplay::PickGazeTarget(float max_x, float max_y) {
@@ -413,6 +470,11 @@ void ValeraLcdDisplay::PlacePupil(Eye* eye, int16_t w, int16_t h, int16_t pupil_
 void ValeraLcdDisplay::Tick() {
     if (!face_ready_ || sleepy_) return;
     ++tick_;
+
+    if (caption_dirty_) {
+        caption_dirty_ = false;
+        ApplyCaption();
+    }
 
     ActiveMode want = ActiveMode::kIdle;
     switch (Application::GetInstance().GetDeviceState()) {
@@ -444,7 +506,6 @@ void ValeraLcdDisplay::Tick() {
         return;
     }
 
-    // Idle carousel.
     ++idle_page_ticks_;
     int limit = kClockTicks;
     if (idle_page_ == IdlePage::kWeather) limit = kWeatherTicks;
@@ -481,6 +542,7 @@ void ValeraLcdDisplay::SetActiveMode(ActiveMode mode) {
     if (mode == ActiveMode::kSleep) {
         LayoutForActive(false);
         ShowIdlePage(IdlePage::kClock);
+        idle_step_ = 0;
     }
     PickGazeTarget(0.18f * (now_active ? act_eye_w_ : play_eye_w_),
                    0.16f * (now_active ? act_eye_h_ : play_eye_h_));
@@ -537,7 +599,6 @@ void ValeraLcdDisplay::AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, 
                 break;
         }
     } else if (playful) {
-        // Sber-like playful: soft color wash + occasional happy squint.
         const float wash = 0.5f + 0.5f * sinf(tick_ * 0.02f);
         eye_color = wash > 0.5f ? lv_color_hex(0xF5FBFF) : lv_color_hex(0xFFF5FB);
         if ((tick_ / 180) % 5 == 0) want_squint = 0.20f;
@@ -580,8 +641,6 @@ void ValeraLcdDisplay::AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, 
 }
 
 void ValeraLcdDisplay::AnimatePlayFx() {
-    // Soft orbs drift on elliptical paths — Sber-ish ambient motion, clipped
-    // to the round safe zone. Opacity only + slow position.
     const float cx = LV_HOR_RES * 0.5f;
     const float cy = LV_VER_RES * 0.5f;
     const float R = LV_HOR_RES * 0.34f;
@@ -603,7 +662,10 @@ void ValeraLcdDisplay::AnimatePlayFx() {
 }
 
 void ValeraLcdDisplay::AnimateSpectrum() {
-    // Live spectrum / waveform under the eyes — listening vs thinking feel.
+    // Compact when 宗主-style caption is visible so text stays readable.
+    const bool compact = has_caption_ && !hide_subtitle_;
+    const float amp = compact ? 36.f : 70.f;
+    const int base_y = compact ? spectrum_base_y_ - 10 : spectrum_base_y_;
     for (int i = 0; i < 14; ++i) {
         float phase = tick_ * 0.22f + i * 0.45f;
         float env = 0.45f + 0.55f * sinf(phase);
@@ -612,11 +674,11 @@ void ValeraLcdDisplay::AnimateSpectrum() {
             env = 0.25f + 0.35f * fabsf(sinf(phase * 0.4f));
         else if (active_mode_ == ActiveMode::kSpeak)
             env = 0.40f + 0.60f * fabsf(sinf(phase * 1.2f));
-        int h = 10 + (int)(70.f * env);
+        int h = 8 + (int)(amp * env);
         lv_obj_set_height(spectrum_[i], h);
-        lv_obj_set_y(spectrum_[i], spectrum_base_y_ + 40 - h);
+        lv_obj_set_y(spectrum_[i], base_y + (compact ? 24 : 40) - h);
         lv_obj_set_style_bg_color(spectrum_[i], (i % 2) ? kMagenta : kCyan, 0);
-        lv_obj_set_style_bg_opa(spectrum_[i], (lv_opa_t)(160 + (int)(80 * env)), 0);
+        lv_obj_set_style_bg_opa(spectrum_[i], (lv_opa_t)(140 + (int)(90 * env)), 0);
     }
 }
 
@@ -634,7 +696,6 @@ void ValeraLcdDisplay::PaintWeather() {
     int out = c.outdoor_ok ? (int)lroundf(c.outdoor_c) : 0;
     int room = c.room_ok ? (int)lroundf(c.room_c) : 0;
     if (!c.outdoor_ok && !c.room_ok) {
-        // Placeholder while sensors warm up — zeros with dim glyph.
         out = 0;
         room = 0;
     }
@@ -649,12 +710,10 @@ void ValeraLcdDisplay::PaintWeather() {
         lv_obj_set_style_bg_color(weather_out_minus_, kCyan, 0);
         LitDigit(weather_out_seg_[0], absv / 10, kCyan);
         LitDigit(weather_out_seg_[1], absv % 10, kCyan);
-        LitDigit(weather_out_seg_[2], -1, kCyan);
 
-        // Geometric weather glyph from WMO-ish code buckets.
         lv_color_t g = kSun;
-        if (c.weather_code >= 51) g = kThink;       // precip-ish
-        else if (c.weather_code >= 3) g = kCloud;   // cloudy
+        if (c.weather_code >= 51) g = kThink;
+        else if (c.weather_code >= 3) g = kCloud;
         else if (c.weather_code >= 1) g = kSun;
         lv_obj_set_style_bg_color(weather_glyph_, g, 0);
     }
@@ -690,11 +749,44 @@ void ValeraLcdDisplay::SetEmotion(const char* emotion) {
 }
 
 void ValeraLcdDisplay::SetChatMessage(const char* role, const char* content) {
-    (void)role;
-    (void)content;
+    DisplayLockGuard lock(this);
+    if (!face_ready_ || caption_label_ == nullptr) return;
+
+    const char* text = (content != nullptr) ? content : "";
+    std::strncpy(caption_text_, text, sizeof(caption_text_) - 1);
+    caption_text_[sizeof(caption_text_) - 1] = '\0';
+
+    lv_color_t color = kWhite;
+    if (role != nullptr) {
+        if (std::strcmp(role, "user") == 0) color = kCyan;
+        else if (std::strcmp(role, "assistant") == 0) color = kWhite;
+        else if (std::strcmp(role, "system") == 0) color = kThink;
+    }
+    lv_obj_set_style_text_color(caption_label_, color, 0);
+
+    // Apply on next Tick so LVGL anim restart stays on the face timer path,
+    // matching XiaoZhi's bottom-bar subtitle contract without fighting Lock.
+    caption_dirty_ = true;
+    ApplyCaption();
 }
 
-void ValeraLcdDisplay::ClearChatMessages() {}
+void ValeraLcdDisplay::ClearChatMessages() {
+    DisplayLockGuard lock(this);
+    caption_text_[0] = '\0';
+    has_caption_ = false;
+    caption_dirty_ = false;
+    if (caption_label_) {
+        lv_anim_delete(caption_label_, nullptr);
+        lv_label_set_text(caption_label_, "");
+    }
+    if (caption_pill_) lv_obj_add_flag(caption_pill_, LV_OBJ_FLAG_HIDDEN);
+}
+
+void ValeraLcdDisplay::SetHideSubtitle(bool hide) {
+    DisplayLockGuard lock(this);
+    hide_subtitle_ = hide;
+    SyncActiveBottom();
+}
 
 void ValeraLcdDisplay::UpdateStatusBar(bool update_all) {
     (void)update_all;
@@ -708,4 +800,10 @@ void ValeraLcdDisplay::SetPowerSaveMode(bool on) {
 
 void ValeraLcdDisplay::SetTheme(Theme* theme) {
     SpiLcdDisplay::SetTheme(theme);
+    DisplayLockGuard lock(this);
+    if (!caption_label_ || theme == nullptr) return;
+    auto* lvgl_theme = static_cast<LvglTheme*>(theme);
+    if (lvgl_theme->text_font()) {
+        lv_obj_set_style_text_font(caption_label_, lvgl_theme->text_font()->font(), 0);
+    }
 }

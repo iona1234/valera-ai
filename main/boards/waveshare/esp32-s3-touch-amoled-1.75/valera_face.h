@@ -2,11 +2,10 @@
 
 #include "display/lcd_display.h"
 
-// Round 466x466 face with three idle pages (clock / weather / playful
-// Sber-like eyes) that cycle on a timer. When the assistant is active,
-// idle pages hide; eyes move to the upper half and a live spectrum sits
-// in the lower half. No tiny labels. 16 ms LVGL timer; no DisplayLockGuard
-// inside Tick.
+// Round 466x466 face.
+// Idle: clock <-> weather, with occasional playful Sber-like eyes.
+// Active (wake «Валера»): eyes on top + spectrum + scrolling subtitle
+// (宗主 / XiaoZhi pattern). 16 ms LVGL timer; no DisplayLockGuard in Tick.
 class ValeraLcdDisplay : public SpiLcdDisplay {
 public:
     ValeraLcdDisplay(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_handle_t panel_handle,
@@ -20,6 +19,7 @@ public:
     void SetEmotion(const char* emotion) override;
     void SetChatMessage(const char* role, const char* content) override;
     void ClearChatMessages() override;
+    void SetHideSubtitle(bool hide) override;
     void UpdateStatusBar(bool update_all = false) override;
     void SetPowerSaveMode(bool on) override;
     void SetTheme(Theme* theme) override;
@@ -48,6 +48,8 @@ private:
     void ShowIdlePage(IdlePage page);
     void AdvanceIdlePage();
     void LayoutForActive(bool active);
+    void ApplyCaption();
+    void SyncActiveBottom();
 
     void PaintClock(const struct tm* tm, bool colon_on);
     void PaintWeather();
@@ -64,15 +66,13 @@ private:
     lv_obj_t* root_ = nullptr;
     lv_obj_t* bezel_ = nullptr;
 
-    // Clock page (centered).
     lv_obj_t* clock_seg_[4][7] = {};
     lv_obj_t* clock_colon_[2] = {};
     lv_obj_t* clock_objs_[30] = {};
     int clock_obj_n_ = 0;
 
-    // Weather page (centered big outdoor temp + glyph + room temp).
     lv_obj_t* weather_glyph_ = nullptr;
-    lv_obj_t* weather_out_seg_[3][7] = {};
+    lv_obj_t* weather_out_seg_[2][7] = {};
     lv_obj_t* weather_out_minus_ = nullptr;
     lv_obj_t* weather_out_dot_ = nullptr;
     lv_obj_t* weather_room_seg_[2][7] = {};
@@ -80,7 +80,6 @@ private:
     lv_obj_t* weather_objs_[40] = {};
     int weather_obj_n_ = 0;
 
-    // Play / screensaver page (centered eyes + floating orbs).
     Eye play_left_{};
     Eye play_right_{};
     lv_obj_t* play_orb_[8] = {};
@@ -91,25 +90,30 @@ private:
     int16_t play_eye_h_ = 70;
     int16_t play_pupil_r_ = 18;
 
-    // Active assistant page (eyes top + spectrum bottom).
     Eye act_left_{};
     Eye act_right_{};
     lv_obj_t* spectrum_[14] = {};
-    lv_obj_t* active_objs_[30] = {};
+    lv_obj_t* caption_pill_ = nullptr;
+    lv_obj_t* caption_label_ = nullptr;
+    lv_obj_t* active_objs_[40] = {};
     int active_obj_n_ = 0;
     int16_t act_eye_w_ = 96;
     int16_t act_eye_h_ = 60;
     int16_t act_pupil_r_ = 16;
-    int16_t act_eye_cy_ = 150;
-    int16_t spectrum_base_y_ = 340;
+    int16_t act_eye_cy_ = 140;
+    int16_t spectrum_base_y_ = 300;
 
     lv_timer_t* timer_ = nullptr;
 
     bool face_ready_ = false;
     bool sleepy_ = false;
     bool assistant_active_ = false;
+    bool caption_dirty_ = false;
+    bool has_caption_ = false;
+    char caption_text_[192] = {};
     int tick_ = 0;
     int idle_page_ticks_ = 0;
+    int idle_step_ = 0;
     int last_hour_ = -1;
     int last_min_ = -1;
     bool last_colon_ = false;
@@ -131,8 +135,8 @@ private:
     float blink_ = 0.f;
     float squint_ = 0.f;
 
-    // Idle page durations at 60 fps.
-    static constexpr int kClockTicks = 12 * 60;    // ~12 s
-    static constexpr int kWeatherTicks = 10 * 60;  // ~10 s
-    static constexpr int kPlayTicks = 14 * 60;     // ~14 s
+    // clock, weather, clock, weather, play — then repeat.
+    static constexpr int kClockTicks = 14 * 60;
+    static constexpr int kWeatherTicks = 10 * 60;
+    static constexpr int kPlayTicks = 12 * 60;
 };

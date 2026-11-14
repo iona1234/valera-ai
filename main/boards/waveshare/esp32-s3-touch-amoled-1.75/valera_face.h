@@ -2,8 +2,11 @@
 
 #include "display/lcd_display.h"
 
-// Round 466x466 AMOLED face: thick readable clock + minimal Sber/RoboEyes-style
-// capsule eyes. No tiny labels. 16 ms LVGL timer; never DisplayLockGuard in Tick.
+// Round 466x466 face with three idle pages (clock / weather / playful
+// Sber-like eyes) that cycle on a timer. When the assistant is active,
+// idle pages hide; eyes move to the upper half and a live spectrum sits
+// in the lower half. No tiny labels. 16 ms LVGL timer; no DisplayLockGuard
+// inside Tick.
 class ValeraLcdDisplay : public SpiLcdDisplay {
 public:
     ValeraLcdDisplay(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_handle_t panel_handle,
@@ -24,51 +27,98 @@ public:
     static void RounderEventCb(lv_event_t* e);
 
 private:
-    enum class FaceMode { kIdle, kListen, kSpeak, kThink, kWifi, kSleep };
+    enum class ActiveMode { kIdle, kListen, kSpeak, kThink, kWifi, kSleep };
+    enum class IdlePage { kClock, kWeather, kPlay };
 
     struct Eye {
-        lv_obj_t* body = nullptr;   // solid capsule
-        lv_obj_t* pupil = nullptr;  // dark pupil only
-        lv_obj_t* shine = nullptr;  // one catchlight
-        int16_t cx = 0;
-        int16_t cy = 0;
+        lv_obj_t* body = nullptr;
+        lv_obj_t* pupil = nullptr;
+        lv_obj_t* shine = nullptr;
+        int16_t home_cx = 0;
+        int16_t home_cy = 0;
     };
 
     static void TickThunk(lv_timer_t* timer);
     void Tick();
     void BuildFace();
-    void BuildEye(Eye* eye, int16_t cx, int16_t cy);
-    void ApplyMode(FaceMode mode);
-    void PaintDigits(const struct tm* tm, bool colon_on);
+    void BuildEye(Eye* eye, int16_t cx, int16_t cy, int16_t w, int16_t h, int16_t pupil_r);
     void HideStockChrome();
+
+    void SetActiveMode(ActiveMode mode);
+    void ShowIdlePage(IdlePage page);
+    void AdvanceIdlePage();
+    void LayoutForActive(bool active);
+
+    void PaintClock(const struct tm* tm, bool colon_on);
+    void PaintWeather();
+    void SetGroupHidden(lv_obj_t* const* objs, int n, bool hidden);
+
     void AnimateAmbient();
-    void AnimateEyes();
-    void AnimateBars();
-    void PickGazeTarget();
-    void PlacePupil(Eye* eye, float look_x, float look_y, float open);
+    void AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, int16_t pupil_r, bool playful);
+    void AnimatePlayFx();
+    void AnimateSpectrum();
+    void PickGazeTarget(float max_x, float max_y);
+    void PlacePupil(Eye* eye, int16_t w, int16_t h, int16_t pupil_r, float look_x, float look_y,
+                    float open);
 
     lv_obj_t* root_ = nullptr;
     lv_obj_t* bezel_ = nullptr;
-    lv_obj_t* seg_[4][7] = {};
-    lv_obj_t* colon_[2] = {};
-    Eye left_{};
-    Eye right_{};
-    lv_obj_t* bars_[6] = {};
+
+    // Clock page (centered).
+    lv_obj_t* clock_seg_[4][7] = {};
+    lv_obj_t* clock_colon_[2] = {};
+    lv_obj_t* clock_objs_[30] = {};
+    int clock_obj_n_ = 0;
+
+    // Weather page (centered big outdoor temp + glyph + room temp).
+    lv_obj_t* weather_glyph_ = nullptr;
+    lv_obj_t* weather_out_seg_[3][7] = {};
+    lv_obj_t* weather_out_minus_ = nullptr;
+    lv_obj_t* weather_out_dot_ = nullptr;
+    lv_obj_t* weather_room_seg_[2][7] = {};
+    lv_obj_t* weather_room_dot_ = nullptr;
+    lv_obj_t* weather_objs_[40] = {};
+    int weather_obj_n_ = 0;
+
+    // Play / screensaver page (centered eyes + floating orbs).
+    Eye play_left_{};
+    Eye play_right_{};
+    lv_obj_t* play_orb_[8] = {};
+    lv_obj_t* play_ring_ = nullptr;
+    lv_obj_t* play_objs_[20] = {};
+    int play_obj_n_ = 0;
+    int16_t play_eye_w_ = 110;
+    int16_t play_eye_h_ = 70;
+    int16_t play_pupil_r_ = 18;
+
+    // Active assistant page (eyes top + spectrum bottom).
+    Eye act_left_{};
+    Eye act_right_{};
+    lv_obj_t* spectrum_[14] = {};
+    lv_obj_t* active_objs_[30] = {};
+    int active_obj_n_ = 0;
+    int16_t act_eye_w_ = 96;
+    int16_t act_eye_h_ = 60;
+    int16_t act_pupil_r_ = 16;
+    int16_t act_eye_cy_ = 150;
+    int16_t spectrum_base_y_ = 340;
+
     lv_timer_t* timer_ = nullptr;
 
     bool face_ready_ = false;
     bool sleepy_ = false;
+    bool assistant_active_ = false;
     int tick_ = 0;
+    int idle_page_ticks_ = 0;
     int last_hour_ = -1;
     int last_min_ = -1;
     bool last_colon_ = false;
-    FaceMode mode_ = FaceMode::kIdle;
+    int last_out_temp_ = 9999;
+    int last_room_temp_ = 9999;
+    int last_weather_code_ = -999;
 
-    int16_t eye_w_ = 88;
-    int16_t eye_h_ = 56;
-    int16_t pupil_r_ = 14;
-    int16_t eye_cy_ = 310;
-    int16_t open_h_ = 56;
+    ActiveMode active_mode_ = ActiveMode::kIdle;
+    IdlePage idle_page_ = IdlePage::kClock;
 
     float look_x_ = 0.f;
     float look_y_ = 0.f;
@@ -80,4 +130,9 @@ private:
     int blink_tick_ = 0;
     float blink_ = 0.f;
     float squint_ = 0.f;
+
+    // Idle page durations at 60 fps.
+    static constexpr int kClockTicks = 12 * 60;    // ~12 s
+    static constexpr int kWeatherTicks = 10 * 60;  // ~10 s
+    static constexpr int kPlayTicks = 14 * 60;     // ~14 s
 };

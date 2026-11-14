@@ -25,7 +25,6 @@ const lv_color_t kPupil = lv_color_hex(0x0A0C10);
 const lv_color_t kWhite = lv_color_hex(0xFFFFFF);
 const lv_color_t kSun = lv_color_hex(0xFFD36A);
 const lv_color_t kCloud = lv_color_hex(0xC8D6E5);
-const lv_color_t kCaptionBg = lv_color_hex(0x0A1218);
 
 constexpr uint8_t kSegBits[10] = {
     0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F,
@@ -63,9 +62,7 @@ void BuildDigit(lv_obj_t* parent, lv_obj_t* segs[7], int x, int y, int dw, int d
 
 void LitDigit(lv_obj_t* segs[7], int digit, lv_color_t on) {
     if (digit < 0 || digit > 9) {
-        for (int s = 0; s < 7; ++s) {
-            lv_obj_set_style_bg_opa(segs[s], LV_OPA_TRANSP, 0);
-        }
+        for (int s = 0; s < 7; ++s) lv_obj_set_style_bg_opa(segs[s], LV_OPA_TRANSP, 0);
         return;
     }
     uint8_t bits = kSegBits[digit];
@@ -164,7 +161,7 @@ void ValeraLcdDisplay::BuildEye(Eye* eye, int16_t cx, int16_t cy, int16_t w, int
     lv_obj_set_style_bg_opa(eye->pupil, LV_OPA_COVER, 0);
 
     eye->shine = MakePlain(eye->body);
-    lv_obj_set_size(eye->shine, 6, 6);
+    lv_obj_set_size(eye->shine, 8, 8);
     lv_obj_set_style_radius(eye->shine, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(eye->shine, kWhite, 0);
     lv_obj_set_style_bg_opa(eye->shine, LV_OPA_80, 0);
@@ -187,16 +184,17 @@ void ValeraLcdDisplay::BuildFace() {
     lv_obj_set_style_bg_color(root_, kBg, 0);
     lv_obj_set_style_bg_opa(root_, LV_OPA_COVER, 0);
 
+    // Soft ambient rim only — not a heavy frame.
     bezel_ = MakePlain(root_);
-    lv_obj_set_size(bezel_, min_side - 20, min_side - 20);
+    lv_obj_set_size(bezel_, min_side - 16, min_side - 16);
     lv_obj_center(bezel_);
     lv_obj_set_style_radius(bezel_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_opa(bezel_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(bezel_, 2, 0);
     lv_obj_set_style_border_color(bezel_, kCyanDim, 0);
-    lv_obj_set_style_border_opa(bezel_, LV_OPA_50, 0);
+    lv_obj_set_style_border_opa(bezel_, LV_OPA_30, 0);
 
-    // Clock: fat digits, optical center of the circle.
+    // ── Clock ────────────────────────────────────────────────────────────
     const int c_dw = (int)(min_side * 0.155f);
     const int c_dh = (int)(min_side * 0.28f);
     const int c_th = (int)(c_dw * 0.22f);
@@ -223,7 +221,7 @@ void ValeraLcdDisplay::BuildFace() {
         Track(clock_objs_, &clock_obj_n_, 30, clock_colon_[i]);
     }
 
-    // Weather: glyph + outdoor 7-seg + room 7-seg.
+    // ── Weather ──────────────────────────────────────────────────────────
     weather_glyph_ = MakePlain(root_);
     lv_obj_set_size(weather_glyph_, 56, 56);
     lv_obj_set_pos(weather_glyph_, cx - 28, cy - 130);
@@ -274,103 +272,134 @@ void ValeraLcdDisplay::BuildFace() {
     lv_obj_set_style_bg_opa(weather_room_dot_, LV_OPA_COVER, 0);
     Track(weather_objs_, &weather_obj_n_, 40, weather_room_dot_);
 
-    // Play screensaver: Sber-like centered eyes + orbs.
-    play_eye_w_ = (int16_t)(min_side * 0.24f);
+    // ── Play / Sber screensaver: big centered eyes + dual rings + orbs ───
+    play_eye_w_ = (int16_t)(min_side * 0.28f);
     play_eye_h_ = (int16_t)(play_eye_w_ * 0.62f);
     play_pupil_r_ = (int16_t)(play_eye_h_ * 0.30f);
-    const int16_t play_gap = (int16_t)(play_eye_w_ * 0.30f);
+    const int16_t play_gap = (int16_t)(play_eye_w_ * 0.28f);
     BuildEye(&play_left_, (int16_t)(cx - play_eye_w_ / 2 - play_gap), (int16_t)cy, play_eye_w_,
              play_eye_h_, play_pupil_r_);
     BuildEye(&play_right_, (int16_t)(cx + play_eye_w_ / 2 + play_gap), (int16_t)cy, play_eye_w_,
              play_eye_h_, play_pupil_r_);
-    Track(play_objs_, &play_obj_n_, 20, play_left_.body);
-    Track(play_objs_, &play_obj_n_, 20, play_right_.body);
+    Track(play_objs_, &play_obj_n_, 28, play_left_.body);
+    Track(play_objs_, &play_obj_n_, 28, play_right_.body);
 
     play_ring_ = MakePlain(root_);
-    lv_obj_set_size(play_ring_, min_side - 80, min_side - 80);
+    lv_obj_set_size(play_ring_, min_side - 70, min_side - 70);
     lv_obj_center(play_ring_);
     lv_obj_set_style_radius(play_ring_, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_opa(play_ring_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(play_ring_, 18, 0);
+    lv_obj_set_style_border_width(play_ring_, 22, 0);
     lv_obj_set_style_border_color(play_ring_, kCyanDim, 0);
     lv_obj_set_style_border_opa(play_ring_, LV_OPA_20, 0);
-    Track(play_objs_, &play_obj_n_, 20, play_ring_);
+    Track(play_objs_, &play_obj_n_, 28, play_ring_);
 
-    for (int i = 0; i < 8; ++i) {
+    play_ring2_ = MakePlain(root_);
+    lv_obj_set_size(play_ring2_, min_side - 140, min_side - 140);
+    lv_obj_center(play_ring2_);
+    lv_obj_set_style_radius(play_ring2_, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(play_ring2_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(play_ring2_, 10, 0);
+    lv_obj_set_style_border_color(play_ring2_, kMagentaDim, 0);
+    lv_obj_set_style_border_opa(play_ring2_, LV_OPA_20, 0);
+    Track(play_objs_, &play_obj_n_, 28, play_ring2_);
+
+    for (int i = 0; i < 10; ++i) {
         play_orb_[i] = MakePlain(root_);
-        const int sz = (i % 2) ? 10 : 16;
+        const int sz = (i % 3 == 0) ? 18 : ((i % 2) ? 10 : 14);
         lv_obj_set_size(play_orb_[i], sz, sz);
         lv_obj_set_style_radius(play_orb_[i], LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_bg_color(play_orb_[i], (i % 2) ? kMagenta : kCyan, 0);
         lv_obj_set_style_bg_opa(play_orb_[i], LV_OPA_40, 0);
         lv_obj_set_pos(play_orb_[i], cx, cy);
-        Track(play_objs_, &play_obj_n_, 20, play_orb_[i]);
+        Track(play_objs_, &play_obj_n_, 28, play_orb_[i]);
     }
 
-    // Active assistant: eyes top, spectrum mid, 宗主-style caption bottom.
-    act_eye_w_ = (int16_t)(min_side * 0.20f);
+    // ── Assistant face: large symmetric eyes + mouth spectrum ────────────
+    act_eye_w_ = (int16_t)(min_side * 0.27f);
     act_eye_h_ = (int16_t)(act_eye_w_ * 0.62f);
     act_pupil_r_ = (int16_t)(act_eye_h_ * 0.30f);
-    act_eye_cy_ = (int16_t)(min_side * 0.28f);
-    const int16_t act_gap = (int16_t)(act_eye_w_ * 0.32f);
+    act_eye_cy_ = (int16_t)(min_side * 0.40f);  // optical center of face pair
+    const int16_t act_gap = (int16_t)(act_eye_w_ * 0.26f);
     BuildEye(&act_left_, (int16_t)(cx - act_eye_w_ / 2 - act_gap), act_eye_cy_, act_eye_w_,
              act_eye_h_, act_pupil_r_);
     BuildEye(&act_right_, (int16_t)(cx + act_eye_w_ / 2 + act_gap), act_eye_cy_, act_eye_w_,
              act_eye_h_, act_pupil_r_);
-    Track(active_objs_, &active_obj_n_, 40, act_left_.body);
-    Track(active_objs_, &active_obj_n_, 40, act_right_.body);
+    Track(face_objs_, &face_obj_n_, 30, act_left_.body);
+    Track(face_objs_, &face_obj_n_, 30, act_right_.body);
 
-    spectrum_base_y_ = (int16_t)(min_side * 0.52f);
-    for (int i = 0; i < 14; ++i) {
+    // Mouth: compact equalizer under eyes (Sber-like "ротик").
+    spectrum_base_y_ = (int16_t)(act_eye_cy_ + act_eye_h_ / 2 + min_side * 0.10f);
+    const int bar_w = 14;
+    const int bar_gap = 8;
+    const int mouth_n = 12;
+    const int mouth_total = mouth_n * bar_w + (mouth_n - 1) * bar_gap;
+    const int mouth_ox = cx - mouth_total / 2;
+    for (int i = 0; i < mouth_n; ++i) {
         spectrum_[i] = MakePlain(root_);
-        lv_obj_set_size(spectrum_[i], 12, 20);
-        lv_obj_set_pos(spectrum_[i], cx - 118 + i * 17, spectrum_base_y_);
-        lv_obj_set_style_radius(spectrum_[i], 6, 0);
+        lv_obj_set_size(spectrum_[i], bar_w, 18);
+        // Mild smile curve: outer bars sit slightly higher.
+        const float t = (i - (mouth_n - 1) * 0.5f) / ((mouth_n - 1) * 0.5f);
+        const int smile = (int)(10.f * t * t);
+        lv_obj_set_pos(spectrum_[i], mouth_ox + i * (bar_w + bar_gap), spectrum_base_y_ + smile);
+        lv_obj_set_style_radius(spectrum_[i], bar_w / 2, 0);
         lv_obj_set_style_bg_color(spectrum_[i], kCyan, 0);
         lv_obj_set_style_bg_opa(spectrum_[i], LV_OPA_COVER, 0);
-        Track(active_objs_, &active_obj_n_, 40, spectrum_[i]);
+        Track(face_objs_, &face_obj_n_, 30, spectrum_[i]);
     }
 
-    // Caption pill stays outside active_objs_ so spectrum/caption toggle independently.
-    // Contrast + cyan rim so it stays readable on pure AMOLED black (宗主 bottom bar).
+    // ── Reply stage: ambient rings/orbs + large wrapped text, no frame ───
+    reply_ring_ = MakePlain(root_);
+    lv_obj_set_size(reply_ring_, min_side - 60, min_side - 60);
+    lv_obj_center(reply_ring_);
+    lv_obj_set_style_radius(reply_ring_, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(reply_ring_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(reply_ring_, 16, 0);
+    lv_obj_set_style_border_color(reply_ring_, kMagentaDim, 0);
+    lv_obj_set_style_border_opa(reply_ring_, LV_OPA_20, 0);
+    Track(reply_objs_, &reply_obj_n_, 20, reply_ring_);
+
+    reply_ring2_ = MakePlain(root_);
+    lv_obj_set_size(reply_ring2_, min_side - 130, min_side - 130);
+    lv_obj_center(reply_ring2_);
+    lv_obj_set_style_radius(reply_ring2_, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(reply_ring2_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(reply_ring2_, 8, 0);
+    lv_obj_set_style_border_color(reply_ring2_, kCyanDim, 0);
+    lv_obj_set_style_border_opa(reply_ring2_, LV_OPA_20, 0);
+    Track(reply_objs_, &reply_obj_n_, 20, reply_ring2_);
+
+    for (int i = 0; i < 6; ++i) {
+        reply_orb_[i] = MakePlain(root_);
+        const int sz = (i % 2) ? 12 : 18;
+        lv_obj_set_size(reply_orb_[i], sz, sz);
+        lv_obj_set_style_radius(reply_orb_[i], LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_color(reply_orb_[i], (i % 2) ? kMagenta : kCyan, 0);
+        lv_obj_set_style_bg_opa(reply_orb_[i], LV_OPA_30, 0);
+        lv_obj_set_pos(reply_orb_[i], cx, cy);
+        Track(reply_objs_, &reply_obj_n_, 20, reply_orb_[i]);
+    }
+
     auto* lvgl_theme = static_cast<LvglTheme*>(current_theme_);
     const lv_font_t* text_font =
         (lvgl_theme && lvgl_theme->text_font()) ? lvgl_theme->text_font()->font() : nullptr;
-    const int line_h = text_font ? text_font->line_height : 22;
-    const int pill_w = (int)(min_side * 0.70f);
-    const int pill_h = line_h + 18;
-    caption_pill_ = MakePlain(root_);
-    lv_obj_set_size(caption_pill_, pill_w, pill_h);
-    lv_obj_set_pos(caption_pill_, (W - pill_w) / 2, (int)(min_side * 0.74f));
-    lv_obj_set_style_radius(caption_pill_, pill_h / 2, 0);
-    lv_obj_set_style_bg_color(caption_pill_, kCaptionBg, 0);
-    lv_obj_set_style_bg_opa(caption_pill_, LV_OPA_90, 0);
-    lv_obj_set_style_border_width(caption_pill_, 1, 0);
-    lv_obj_set_style_border_color(caption_pill_, kCyanDim, 0);
-    lv_obj_set_style_border_opa(caption_pill_, LV_OPA_60, 0);
-    lv_obj_set_style_pad_left(caption_pill_, 14, 0);
-    lv_obj_set_style_pad_right(caption_pill_, 14, 0);
-    lv_obj_add_flag(caption_pill_, LV_OBJ_FLAG_HIDDEN);
-
-    caption_label_ = lv_label_create(caption_pill_);
+    // Board uses Noto 30 — large enough for round 466; wrap in center safe zone.
+    const int text_w = (int)(min_side * 0.68f);
+    caption_label_ = lv_label_create(root_);
     lv_label_set_text(caption_label_, "");
-    lv_obj_set_width(caption_label_, pill_w - 28);
-    lv_label_set_long_mode(caption_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_width(caption_label_, text_w);
+    lv_label_set_long_mode(caption_label_, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_align(caption_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_color(caption_label_, kWhite, 0);
+    lv_obj_set_style_text_line_space(caption_label_, 8, 0);
     if (text_font) lv_obj_set_style_text_font(caption_label_, text_font, 0);
     lv_obj_align(caption_label_, LV_ALIGN_CENTER, 0, 0);
-    static lv_anim_t caption_anim;
-    lv_anim_init(&caption_anim);
-    lv_anim_set_delay(&caption_anim, 800);
-    lv_anim_set_repeat_count(&caption_anim, LV_ANIM_REPEAT_INFINITE);
-    lv_obj_set_style_anim(caption_label_, &caption_anim, LV_PART_MAIN);
-    lv_obj_set_style_anim_duration(caption_label_, lv_anim_speed_clamped(50, 300, 60000),
-                                   LV_PART_MAIN);
+    Track(reply_objs_, &reply_obj_n_, 20, caption_label_);
 
     idle_step_ = 0;
     ShowIdlePage(IdlePage::kClock);
-    SetGroupHidden(active_objs_, active_obj_n_, true);
+    SetGroupHidden(face_objs_, face_obj_n_, true);
+    SetGroupHidden(reply_objs_, reply_obj_n_, true);
     PickGazeTarget(play_eye_w_ * 0.18f, play_eye_h_ * 0.16f);
     next_blink_tick_ = 100 + (rand() % 120);
 }
@@ -386,6 +415,10 @@ void ValeraLcdDisplay::SetGroupHidden(lv_obj_t* const* objs, int n, bool hidden)
         if (hidden) lv_obj_add_flag(objs[i], LV_OBJ_FLAG_HIDDEN);
         else lv_obj_clear_flag(objs[i], LV_OBJ_FLAG_HIDDEN);
     }
+}
+
+bool ValeraLcdDisplay::InReplyStage() const {
+    return assistant_active_ && has_caption_ && !hide_subtitle_;
 }
 
 void ValeraLcdDisplay::ShowIdlePage(IdlePage page) {
@@ -407,7 +440,6 @@ void ValeraLcdDisplay::ShowIdlePage(IdlePage page) {
 }
 
 void ValeraLcdDisplay::AdvanceIdlePage() {
-    // Default product loop: clock <-> weather, play every other weather visit.
     static const IdlePage kSeq[] = {IdlePage::kClock, IdlePage::kWeather, IdlePage::kClock,
                                     IdlePage::kWeather, IdlePage::kPlay};
     idle_step_ = (idle_step_ + 1) % 5;
@@ -420,34 +452,31 @@ void ValeraLcdDisplay::LayoutForActive(bool active) {
         SetGroupHidden(clock_objs_, clock_obj_n_, true);
         SetGroupHidden(weather_objs_, weather_obj_n_, true);
         SetGroupHidden(play_objs_, play_obj_n_, true);
-        SetGroupHidden(active_objs_, active_obj_n_, false);
-        SyncActiveBottom();
+        SyncActiveStage();
     } else {
-        SetGroupHidden(active_objs_, active_obj_n_, true);
-        if (caption_pill_) lv_obj_add_flag(caption_pill_, LV_OBJ_FLAG_HIDDEN);
+        SetGroupHidden(face_objs_, face_obj_n_, true);
+        SetGroupHidden(reply_objs_, reply_obj_n_, true);
         idle_step_ = 0;
         ShowIdlePage(IdlePage::kClock);
     }
 }
 
-void ValeraLcdDisplay::SyncActiveBottom() {
+void ValeraLcdDisplay::SyncActiveStage() {
     if (!assistant_active_) {
-        if (caption_pill_) lv_obj_add_flag(caption_pill_, LV_OBJ_FLAG_HIDDEN);
+        SetGroupHidden(face_objs_, face_obj_n_, true);
+        SetGroupHidden(reply_objs_, reply_obj_n_, true);
         return;
     }
-    const bool show_cap = has_caption_ && !hide_subtitle_;
-    if (caption_pill_) {
-        if (show_cap) lv_obj_clear_flag(caption_pill_, LV_OBJ_FLAG_HIDDEN);
-        else lv_obj_add_flag(caption_pill_, LV_OBJ_FLAG_HIDDEN);
-    }
+    const bool reply = InReplyStage();
+    SetGroupHidden(face_objs_, face_obj_n_, reply);
+    SetGroupHidden(reply_objs_, reply_obj_n_, !reply);
 }
 
 void ValeraLcdDisplay::ApplyCaption() {
     if (!caption_label_) return;
-    lv_anim_delete(caption_label_, nullptr);
     lv_label_set_text(caption_label_, caption_text_);
     has_caption_ = caption_text_[0] != '\0';
-    SyncActiveBottom();
+    SyncActiveStage();
 }
 
 void ValeraLcdDisplay::PickGazeTarget(float max_x, float max_y) {
@@ -505,8 +534,12 @@ void ValeraLcdDisplay::Tick() {
     AnimateAmbient();
 
     if (assistant_active_) {
-        AnimateEyes(&act_left_, &act_right_, act_eye_w_, act_eye_h_, act_pupil_r_, false);
-        AnimateSpectrum();
+        if (InReplyStage()) {
+            AnimateReplyFx();
+        } else {
+            AnimateEyes(&act_left_, &act_right_, act_eye_w_, act_eye_h_, act_pupil_r_, false);
+            AnimateSpectrum();
+        }
         return;
     }
 
@@ -543,6 +576,7 @@ void ValeraLcdDisplay::SetActiveMode(ActiveMode mode) {
     active_mode_ = mode;
     const bool now_active = mode != ActiveMode::kIdle && mode != ActiveMode::kSleep;
     if (now_active != was_active) LayoutForActive(now_active);
+    else if (now_active) SyncActiveStage();
     if (mode == ActiveMode::kSleep) {
         LayoutForActive(false);
         ShowIdlePage(IdlePage::kClock);
@@ -556,17 +590,16 @@ void ValeraLcdDisplay::AnimateAmbient() {
     const float breath = 0.5f + 0.5f * sinf(tick_ * 0.025f);
     lv_color_t rim = kCyanDim;
     if (assistant_active_) {
-        if (active_mode_ == ActiveMode::kListen) rim = kCyan;
+        if (InReplyStage()) rim = kMagenta;
+        else if (active_mode_ == ActiveMode::kListen) rim = kCyan;
         else if (active_mode_ == ActiveMode::kSpeak) rim = kMagenta;
         else if (active_mode_ == ActiveMode::kThink) rim = kThink;
         else if (active_mode_ == ActiveMode::kWifi) rim = ((tick_ / 28) % 2) ? kCyan : kMagenta;
     } else if (idle_page_ == IdlePage::kPlay) {
         rim = ((tick_ / 40) % 2) ? kCyanDim : kMagentaDim;
-    } else if (idle_page_ == IdlePage::kWeather) {
-        rim = kCyanDim;
     }
     lv_obj_set_style_border_color(bezel_, rim, 0);
-    lv_obj_set_style_border_opa(bezel_, (lv_opa_t)(40 + (int)(55 * breath)), 0);
+    lv_obj_set_style_border_opa(bezel_, (lv_opa_t)(24 + (int)(40 * breath)), 0);
 }
 
 void ValeraLcdDisplay::AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, int16_t pupil_r,
@@ -587,7 +620,7 @@ void ValeraLcdDisplay::AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, 
                 break;
             case ActiveMode::kSpeak:
                 speed = 0.12f;
-                want_squint = 0.16f;
+                want_squint = 0.14f;
                 eye_color = lv_color_hex(0xFFE8F6);
                 break;
             case ActiveMode::kThink:
@@ -603,9 +636,12 @@ void ValeraLcdDisplay::AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, 
                 break;
         }
     } else if (playful) {
+        // Sber Combine vibe: soft wash + happy squint pulses.
         const float wash = 0.5f + 0.5f * sinf(tick_ * 0.02f);
         eye_color = wash > 0.5f ? lv_color_hex(0xF5FBFF) : lv_color_hex(0xFFF5FB);
-        if ((tick_ / 180) % 5 == 0) want_squint = 0.20f;
+        if ((tick_ / 160) % 4 == 0) want_squint = 0.22f;
+        // Gentle vertical bob of the whole pair.
+        bias_y = 4.f * sinf(tick_ * 0.035f);
         speed = 0.07f;
     }
 
@@ -632,7 +668,7 @@ void ValeraLcdDisplay::AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, 
         if (blink_ <= 0.f) {
             blink_ = 0.f;
             blink_phase_ = 0;
-            next_blink_tick_ = tick_ + (playful ? 80 : 110) + (rand() % 140);
+            next_blink_tick_ = tick_ + (playful ? 70 : 110) + (rand() % 140);
         }
     }
 
@@ -647,42 +683,66 @@ void ValeraLcdDisplay::AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, 
 void ValeraLcdDisplay::AnimatePlayFx() {
     const float cx = LV_HOR_RES * 0.5f;
     const float cy = LV_VER_RES * 0.5f;
-    const float R = LV_HOR_RES * 0.34f;
+    const float R = LV_HOR_RES * 0.36f;
     const float breath = 0.5f + 0.5f * sinf(tick_ * 0.03f);
-    lv_obj_set_style_border_opa(play_ring_, (lv_opa_t)(12 + (int)(28 * breath)), 0);
-    lv_obj_set_style_border_color(play_ring_, ((tick_ / 50) % 2) ? kCyanDim : kMagentaDim, 0);
+    lv_obj_set_style_border_opa(play_ring_, (lv_opa_t)(14 + (int)(36 * breath)), 0);
+    lv_obj_set_style_border_color(play_ring_, ((tick_ / 45) % 2) ? kCyanDim : kMagentaDim, 0);
+    lv_obj_set_style_border_opa(play_ring2_, (lv_opa_t)(10 + (int)(30 * (1.f - breath))), 0);
+    lv_obj_set_style_border_color(play_ring2_, ((tick_ / 45) % 2) ? kMagentaDim : kCyanDim, 0);
 
-    for (int i = 0; i < 8; ++i) {
-        const float a = tick_ * (0.018f + i * 0.002f) + i * 0.9f;
-        const float rx = R * (0.55f + 0.35f * ((i % 3) / 2.f));
-        const float ry = R * (0.40f + 0.30f * (((i + 1) % 3) / 2.f));
+    for (int i = 0; i < 10; ++i) {
+        const float a = tick_ * (0.016f + i * 0.0018f) + i * 0.75f;
+        const float rx = R * (0.50f + 0.40f * ((i % 3) / 2.f));
+        const float ry = R * (0.38f + 0.32f * (((i + 1) % 3) / 2.f));
         const int x = (int)(cx + rx * cosf(a));
-        const int y = (int)(cy + ry * sinf(a * 0.85f + 0.4f));
-        const int sz = (i % 2) ? 10 : 16;
+        const int y = (int)(cy + ry * sinf(a * 0.88f + 0.35f));
+        const int sz = (i % 3 == 0) ? 18 : ((i % 2) ? 10 : 14);
         lv_obj_set_pos(play_orb_[i], x - sz / 2, y - sz / 2);
-        const float tw = 0.35f + 0.65f * fabsf(sinf(tick_ * 0.04f + i));
-        lv_obj_set_style_bg_opa(play_orb_[i], (lv_opa_t)(30 + (int)(140 * tw)), 0);
+        const float tw = 0.30f + 0.70f * fabsf(sinf(tick_ * 0.045f + i));
+        lv_obj_set_style_bg_opa(play_orb_[i], (lv_opa_t)(28 + (int)(150 * tw)), 0);
     }
 }
 
 void ValeraLcdDisplay::AnimateSpectrum() {
-    // Compact when 宗主-style caption is visible so text stays readable.
-    const bool compact = has_caption_ && !hide_subtitle_;
-    const float amp = compact ? 32.f : 70.f;
-    const int base_y = compact ? spectrum_base_y_ - 16 : spectrum_base_y_;
-    for (int i = 0; i < 14; ++i) {
-        float phase = tick_ * 0.22f + i * 0.45f;
-        float env = 0.45f + 0.55f * sinf(phase);
-        if (active_mode_ == ActiveMode::kListen) env = 0.35f + 0.65f * fabsf(sinf(phase));
+    // Mouth ladder under the eyes — listening / thinking / speaking envelopes.
+    for (int i = 0; i < 12; ++i) {
+        float phase = tick_ * 0.24f + i * 0.48f;
+        float env = 0.40f + 0.60f * fabsf(sinf(phase));
+        if (active_mode_ == ActiveMode::kListen) env = 0.30f + 0.70f * fabsf(sinf(phase));
         else if (active_mode_ == ActiveMode::kThink)
-            env = 0.25f + 0.35f * fabsf(sinf(phase * 0.4f));
+            env = 0.20f + 0.35f * fabsf(sinf(phase * 0.35f));
         else if (active_mode_ == ActiveMode::kSpeak)
-            env = 0.40f + 0.60f * fabsf(sinf(phase * 1.2f));
-        int h = 8 + (int)(amp * env);
+            env = 0.35f + 0.65f * fabsf(sinf(phase * 1.15f));
+        const float t = (i - 5.5f) / 5.5f;
+        const int smile = (int)(10.f * t * t);
+        int h = 10 + (int)(56.f * env);
         lv_obj_set_height(spectrum_[i], h);
-        lv_obj_set_y(spectrum_[i], base_y + (compact ? 20 : 40) - h);
+        lv_obj_set_y(spectrum_[i], spectrum_base_y_ + smile + 28 - h);
         lv_obj_set_style_bg_color(spectrum_[i], (i % 2) ? kMagenta : kCyan, 0);
-        lv_obj_set_style_bg_opa(spectrum_[i], (lv_opa_t)(140 + (int)(90 * env)), 0);
+        lv_obj_set_style_bg_opa(spectrum_[i], (lv_opa_t)(150 + (int)(90 * env)), 0);
+    }
+}
+
+void ValeraLcdDisplay::AnimateReplyFx() {
+    const float cx = LV_HOR_RES * 0.5f;
+    const float cy = LV_VER_RES * 0.5f;
+    const float breath = 0.5f + 0.5f * sinf(tick_ * 0.028f);
+    lv_obj_set_style_border_opa(reply_ring_, (lv_opa_t)(12 + (int)(34 * breath)), 0);
+    lv_obj_set_style_border_color(reply_ring_, kMagentaDim, 0);
+    lv_obj_set_style_border_opa(reply_ring2_, (lv_opa_t)(10 + (int)(28 * (1.f - breath))), 0);
+    lv_obj_set_style_border_color(reply_ring2_, kCyanDim, 0);
+
+    const float R = LV_HOR_RES * 0.38f;
+    for (int i = 0; i < 6; ++i) {
+        const float a = tick_ * (0.012f + i * 0.002f) + i * 1.1f;
+        const float rx = R * (0.62f + 0.18f * (i % 2));
+        const float ry = R * (0.55f + 0.15f * ((i + 1) % 2));
+        const int sz = (i % 2) ? 12 : 18;
+        const int x = (int)(cx + rx * cosf(a));
+        const int y = (int)(cy + ry * sinf(a * 0.9f));
+        lv_obj_set_pos(reply_orb_[i], x - sz / 2, y - sz / 2);
+        const float tw = 0.35f + 0.65f * fabsf(sinf(tick_ * 0.035f + i));
+        lv_obj_set_style_bg_opa(reply_orb_[i], (lv_opa_t)(20 + (int)(110 * tw)), 0);
     }
 }
 
@@ -768,8 +828,6 @@ void ValeraLcdDisplay::SetChatMessage(const char* role, const char* content) {
     }
     lv_obj_set_style_text_color(caption_label_, color, 0);
 
-    // Apply on next Tick so LVGL anim restart stays on the face timer path,
-    // matching XiaoZhi's bottom-bar subtitle contract without fighting Lock.
     caption_dirty_ = true;
     ApplyCaption();
 }
@@ -779,17 +837,14 @@ void ValeraLcdDisplay::ClearChatMessages() {
     caption_text_[0] = '\0';
     has_caption_ = false;
     caption_dirty_ = false;
-    if (caption_label_) {
-        lv_anim_delete(caption_label_, nullptr);
-        lv_label_set_text(caption_label_, "");
-    }
-    if (caption_pill_) lv_obj_add_flag(caption_pill_, LV_OBJ_FLAG_HIDDEN);
+    if (caption_label_) lv_label_set_text(caption_label_, "");
+    SyncActiveStage();
 }
 
 void ValeraLcdDisplay::SetHideSubtitle(bool hide) {
     DisplayLockGuard lock(this);
     hide_subtitle_ = hide;
-    SyncActiveBottom();
+    SyncActiveStage();
 }
 
 void ValeraLcdDisplay::UpdateStatusBar(bool update_all) {

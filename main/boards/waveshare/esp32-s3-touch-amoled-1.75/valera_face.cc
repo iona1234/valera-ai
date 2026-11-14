@@ -320,7 +320,7 @@ void ValeraLcdDisplay::BuildFace() {
     Track(active_objs_, &active_obj_n_, 40, act_left_.body);
     Track(active_objs_, &active_obj_n_, 40, act_right_.body);
 
-    spectrum_base_y_ = (int16_t)(min_side * 0.58f);
+    spectrum_base_y_ = (int16_t)(min_side * 0.52f);
     for (int i = 0; i < 14; ++i) {
         spectrum_[i] = MakePlain(root_);
         lv_obj_set_size(spectrum_[i], 12, 20);
@@ -332,18 +332,22 @@ void ValeraLcdDisplay::BuildFace() {
     }
 
     // Caption pill stays outside active_objs_ so spectrum/caption toggle independently.
+    // Contrast + cyan rim so it stays readable on pure AMOLED black (宗主 bottom bar).
     auto* lvgl_theme = static_cast<LvglTheme*>(current_theme_);
     const lv_font_t* text_font =
         (lvgl_theme && lvgl_theme->text_font()) ? lvgl_theme->text_font()->font() : nullptr;
     const int line_h = text_font ? text_font->line_height : 22;
-    const int pill_w = (int)(min_side * 0.72f);
-    const int pill_h = line_h + 16;
+    const int pill_w = (int)(min_side * 0.70f);
+    const int pill_h = line_h + 18;
     caption_pill_ = MakePlain(root_);
     lv_obj_set_size(caption_pill_, pill_w, pill_h);
-    lv_obj_set_pos(caption_pill_, (W - pill_w) / 2, (int)(min_side * 0.78f));
+    lv_obj_set_pos(caption_pill_, (W - pill_w) / 2, (int)(min_side * 0.74f));
     lv_obj_set_style_radius(caption_pill_, pill_h / 2, 0);
     lv_obj_set_style_bg_color(caption_pill_, kCaptionBg, 0);
-    lv_obj_set_style_bg_opa(caption_pill_, LV_OPA_80, 0);
+    lv_obj_set_style_bg_opa(caption_pill_, LV_OPA_90, 0);
+    lv_obj_set_style_border_width(caption_pill_, 1, 0);
+    lv_obj_set_style_border_color(caption_pill_, kCyanDim, 0);
+    lv_obj_set_style_border_opa(caption_pill_, LV_OPA_60, 0);
     lv_obj_set_style_pad_left(caption_pill_, 14, 0);
     lv_obj_set_style_pad_right(caption_pill_, 14, 0);
     lv_obj_add_flag(caption_pill_, LV_OBJ_FLAG_HIDDEN);
@@ -664,8 +668,8 @@ void ValeraLcdDisplay::AnimatePlayFx() {
 void ValeraLcdDisplay::AnimateSpectrum() {
     // Compact when 宗主-style caption is visible so text stays readable.
     const bool compact = has_caption_ && !hide_subtitle_;
-    const float amp = compact ? 36.f : 70.f;
-    const int base_y = compact ? spectrum_base_y_ - 10 : spectrum_base_y_;
+    const float amp = compact ? 32.f : 70.f;
+    const int base_y = compact ? spectrum_base_y_ - 16 : spectrum_base_y_;
     for (int i = 0; i < 14; ++i) {
         float phase = tick_ * 0.22f + i * 0.45f;
         float env = 0.45f + 0.55f * sinf(phase);
@@ -676,7 +680,7 @@ void ValeraLcdDisplay::AnimateSpectrum() {
             env = 0.40f + 0.60f * fabsf(sinf(phase * 1.2f));
         int h = 8 + (int)(amp * env);
         lv_obj_set_height(spectrum_[i], h);
-        lv_obj_set_y(spectrum_[i], base_y + (compact ? 24 : 40) - h);
+        lv_obj_set_y(spectrum_[i], base_y + (compact ? 20 : 40) - h);
         lv_obj_set_style_bg_color(spectrum_[i], (i % 2) ? kMagenta : kCyan, 0);
         lv_obj_set_style_bg_opa(spectrum_[i], (lv_opa_t)(140 + (int)(90 * env)), 0);
     }

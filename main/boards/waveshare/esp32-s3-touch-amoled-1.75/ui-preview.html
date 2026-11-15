@@ -68,6 +68,7 @@
     <button class="item" data-s="radio"><span class="dot"></span>Радио<span class="tag ru">RU</span></button>
     <button class="item" data-s="stations"><span class="dot"></span>Станции · скролл<span class="tag ru">Popka</span></button>
     <button class="item" data-s="volume"><span class="dot"></span>Громкость</button>
+    <button class="item" data-s="wifi"><span class="dot"></span>Wi‑Fi</button>
     <button class="item" data-s="gallery"><span class="dot"></span>Галерея</button>
     <button class="item" data-s="all"><span class="dot"></span>Все окна сеткой</button>
     <div class="note">
@@ -100,12 +101,24 @@ const STATIONS = [
   {name:"Наше Радио", genre:"rock", color:"#E2483D", kbps:128},
   {name:"Европа Плюс", genre:"hits", color:"#3E7BDB", kbps:128},
   {name:"Европа Плюс Москва", genre:"hits", color:"#5FA8A0", kbps:128},
+  {name:"Русское Радио", genre:"hits", color:"#C0392B", kbps:128},
   {name:"Maximum", genre:"rock", color:"#F2994A", kbps:96},
   {name:"DFM", genre:"dance", color:"#9B5CFF", kbps:96},
   {name:"Hit FM", genre:"hits", color:"#FF6A13", kbps:96},
   {name:"Radio Record", genre:"dance", color:"#E6007E", kbps:96},
   {name:"Record VIP House", genre:"dance", color:"#C9A0FF", kbps:96},
   {name:"Record Techno", genre:"dance", color:"#0E8C8A", kbps:96},
+  {name:"Record Mix", genre:"dance", color:"#7CC47F", kbps:96},
+  {name:"Record Russian Hits", genre:"hits", color:"#FF8A65", kbps:96},
+  {name:"Record Trap", genre:"dance", color:"#8FB6FF", kbps:96},
+  {name:"Record House Hits", genre:"dance", color:"#F5C400", kbps:96},
+  {name:"Record Synthwave", genre:"dance", color:"#5B8DEF", kbps:96},
+  {name:"Record Club", genre:"dance", color:"#FF6B6B", kbps:96},
+  {name:"Монте-Карло", genre:"lounge", color:"#D4AF37", kbps:96},
+  {name:"Ретро FM", genre:"hits", color:"#C45C26", kbps:256},
+  {name:"Дорожное радио", genre:"hits", color:"#2E86AB", kbps:128},
+  {name:"Шансон", genre:"chanson", color:"#8B4513", kbps:128},
+  {name:"Серебряный Дождь", genre:"talk", color:"#A0AEC0", kbps:128},
   {name:"Вести FM", genre:"news", color:"#2E6FE0", kbps:192},
   {name:"Маяк", genre:"news", color:"#F5C400", kbps:192},
 ];
@@ -117,15 +130,16 @@ const FOLDERS = [
 ];
 const META = {
   clock:{t:"Циферблат · Stack", d:"Огромные HH белые / MM coral, без двоеточия. Как у автора на YouTube."},
-  weather:{t:"Погода", d:"Улица (Open-Meteo) + комната (BME280, если подключён)."},
-  play:{t:"Глаза idle", d:"Короткий playful-экран в цикле простоя."},
+  weather:{t:"Погода", d:"Крупная улица °C + дома °C + условие; мягкий pulse на глифе."},
+  play:{t:"Глаза idle · Sber", d:"Двойные кольца + орбы + взгляд — вайб платёжного терминала Сбера."},
   shade:{t:"Быстрые настройки", d:"Свайп вниз: яркость, громкость, Wi‑Fi, Always On."},
-  listen:{t:"Слушает", d:"Глаза + зеркальный рот-спектр, без текста."},
-  think:{t:"Думает", d:"Та же морда, спокойнее анимация."},
-  speak:{t:"Ответ", d:"Крупный текст без глаз и без рамки."},
+  listen:{t:"Слушает", d:"Глаза + симметричный cyan рот-EQ (11 столбиков, L↔R mirror), без текста."},
+  think:{t:"Думает", d:"Та же морда, спокойнее violet анимация."},
+  speak:{t:"Ответ", d:"Голосовой помощник: крупный текст + коралловый живой EQ (не cyan listen)."},
   radio:{t:"Радио · Poster", d:"Российские станции, лучи-EQ, STATIONS / VOLUME, Play у края."},
   stations:{t:"Станции · скролл Popka", d:"Карточки 410×104, сжатие/затухание у края круга, инерция. Тяни пальцем."},
   volume:{t:"Громкость", d:"+/− вокруг динамика, дуга уровня."},
+  wifi:{t:"Wi‑Fi настройка", d:"Hotspot Xiaozhi-XXXX → браузер с формой сети. Первый boot без SSID входит сам."},
   gallery:{t:"Галерея приложений", d:"Карточки приложений со скроллом как у Popka."},
   all:{t:"Все окна", d:"Сетка скринов каждого экрана."},
 };
@@ -172,12 +186,12 @@ function drawClock(c){
 }
 function drawWeather(c){
   clear(c);
-  const g=c.createRadialGradient(CX,CY-110,4,CX,CY-110,40);g.addColorStop(0,'#FFE08A');g.addColorStop(1,'#F5A524');
-  c.fillStyle=g;c.beginPath();c.arc(CX,CY-110,28,0,Math.PI*2);c.fill();
+  const g=c.createRadialGradient(CX,CY-140,4,CX,CY-140,36);g.addColorStop(0,'#FFE08A');g.addColorStop(1,'#F5A524');
+  c.fillStyle=g;c.beginPath();c.arc(CX,CY-140,26,0,Math.PI*2);c.fill();
   c.textAlign='center';c.textBaseline='middle';
-  c.font='800 96px Outfit,sans-serif';c.fillStyle='#5EEAD4';c.fillText('−12°',CX,CY+10);
-  c.font='700 42px Outfit,sans-serif';c.fillStyle='#FF4DB8';c.fillText('24°',CX,CY+88);
-  c.font='600 16px Outfit,sans-serif';c.fillStyle='#8b95a8';c.fillText('улица · комната',CX,CY+128);
+  c.font='800 110px Outfit,sans-serif';c.fillStyle='#00E8FF';c.fillText('−12°',CX,CY-8);
+  c.font='700 28px Outfit,sans-serif';c.fillStyle='#FF4DB8';c.fillText('дома 24°',CX,CY+70);
+  c.font='600 18px Outfit,sans-serif';c.fillStyle='#9AB4C8';c.fillText('ОБЛАЧНО',CX,CY+108);
   unclip(c);
 }
 function drawEyes(c,t,playful,listening){
@@ -193,9 +207,16 @@ function drawEyes(c,t,playful,listening){
   }
   eye(CX-78);eye(CX+78);
   if(listening){
-    for(let i=0;i<11;i++){
-      const x=CX-90+i*18, h=8+Math.abs(Math.sin(t*.008+i*.55))*28+(i===5?10:0);
-      c.fillStyle=i%2?'#FF8FA3':'#5EEAD4';rr(c,x-5,320-h,10,h*2,5);c.fill();
+    // 11 bars, perfect L↔R mirror, cyan listen palette
+    const n=11, mid=5, barW=12, gap=7, total=n*barW+(n-1)*gap, ox=CX-total/2, cy=320;
+    for(let i=0;i<n;i++){
+      const m=i<=mid?i:(n-1-i);
+      const shape=.22+.78*Math.sin((m+.5)/(mid+1)*Math.PI/2);
+      const wave=.45+.55*Math.abs(Math.sin(t*.008+m*.7));
+      const env=Math.min(1,Math.max(.12,shape*(.35+.9*wave)));
+      const h=12+64*env;
+      c.fillStyle=m%2?'#7EEBFF':'#00E8FF';
+      rr(c,ox+i*(barW+gap),cy-h/2,barW,h,barW/2);c.fill();
     }
   } else if(playful){
     c.strokeStyle='rgba(124,255,178,.25)';c.lineWidth=2;c.beginPath();c.arc(CX,CY,200,0,Math.PI*2);c.stroke();
@@ -208,10 +229,21 @@ function drawSpeak(c,t){
     const a=t*.0007+i*1.05,R=195;
     const x=CX+Math.cos(a)*R*(.78+.08*(i%2)), y=CY+Math.sin(a*.92)*R*(.78+.08*((i+1)%2));
     c.globalAlpha=.12+.25*Math.abs(Math.sin(t*.002+i));
-    c.fillStyle=i%2?'#FF8FA3':'#5EEAD4';c.beginPath();c.arc(x,y,i%2?9:14,0,Math.PI*2);c.fill();
+    c.fillStyle=i%2?'#FF8FA3':'#FF4DB8';c.beginPath();c.arc(x,y,i%2?9:14,0,Math.PI*2);c.fill();
   }
   c.globalAlpha=1;c.fillStyle='#F4F7FB';c.textAlign='center';c.textBaseline='middle';c.font='600 28px Outfit,sans-serif';
   ['Привет! Я Валера —','чем помочь?'].forEach((ln,i)=>c.fillText(ln,CX,CY-18+i*36));
+  // coral living voice EQ (same 11-bar mirror geometry as listen mouth, different color/role)
+  const n=11, mid=5, barW=12, gap=7, total=n*barW+(n-1)*gap, ox=CX-total/2, cy=390;
+  for(let i=0;i<n;i++){
+    const m=i<=mid?i:(n-1-i);
+    const shape=.22+.78*Math.sin((m+.5)/(mid+1)*Math.PI/2);
+    const wave=.45+.55*Math.abs(Math.sin(t*.01+m*.7));
+    const env=Math.min(1,Math.max(.12,shape*(.35+.95*wave)));
+    const h=10+50*env;
+    c.fillStyle=m%2?'#FF4DB8':'#FF8FA3';
+    rr(c,ox+i*(barW+gap),cy-h/2,barW,h,barW/2);c.fill();
+  }
   unclip(c);
 }
 function drawRadio(c,t){
@@ -326,6 +358,19 @@ function drawGallery(c){
   unclip(c);
 }
 
+function drawWifi(c,t){
+  clear(c);
+  c.textAlign='center';c.textBaseline='middle';
+  c.fillStyle='#FF8A3D';c.font='800 28px Outfit,sans-serif';c.fillText('Wi-Fi',CX,70);
+  c.fillStyle='#FFF8EE';c.font='700 22px Outfit,sans-serif';c.fillText('Xiaozhi-A1B2',CX,CY-40);
+  c.fillStyle='#9AB4C8';c.font='500 15px Outfit,sans-serif';
+  c.fillText('1) Подключитесь к точке',CX,CY+20);
+  c.fillText('2) Браузер → http://192.168.4.1',CX,CY+48);
+  const pulse=.5+.5*Math.sin(t*.005);
+  c.strokeStyle=`rgba(255,138,61,${.35+.45*pulse})`;c.lineWidth=3;
+  c.beginPath();c.arc(CX,CY,200,0,Math.PI*2);c.stroke();
+  unclip(c);
+}
 function paint(name,c,t){
   switch(name){
     case 'clock': drawClock(c); break;
@@ -339,11 +384,12 @@ function paint(name,c,t){
     case 'volume': drawVolume(c); break;
     case 'shade': drawShade(c); break;
     case 'gallery': drawGallery(c); break;
+    case 'wifi': drawWifi(c,t); break;
     default: drawClock(c);
   }
 }
 
-const ALL=['clock','weather','play','shade','listen','think','speak','radio','stations','volume','gallery'];
+const ALL=['clock','weather','play','shade','listen','think','speak','wifi','radio','stations','volume','gallery'];
 const grid=document.getElementById('grid');
 ALL.forEach(id=>{
   const cell=document.createElement('div'); cell.className='cell';

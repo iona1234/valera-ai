@@ -13,6 +13,7 @@
 #include "axp2101.h"
 #include "i2c_device.h"
 #include "valera_face.h"
+#include "valera_radio_stations.h"
 #include "valera_sensors.h"
 
 #include <esp_log.h>
@@ -423,6 +424,42 @@ private:
             "Текущая погода Барнаула (улица) и показания комнатного BME280, если он подключён.",
             PropertyList(),
             [](const PropertyList& properties) -> ReturnValue { return ValeraSensors::Describe(); });
+        mcp_server.AddTool(
+            "self.valera.clock_style",
+            "Стиль часов Valera (Popka Stack). look: 0=Stack, 1=Neon, 2=Soft; "
+            "scale_pct 80..160; hh_color/mm_color как 0xRRGGBB.",
+            PropertyList({Property("look", kPropertyTypeInteger, 0, 0, 2),
+                          Property("scale_pct", kPropertyTypeInteger, 100, 80, 160),
+                          Property("hh_color", kPropertyTypeInteger, 0xFFFFFF),
+                          Property("mm_color", kPropertyTypeInteger, 0xFF8FA3)}),
+            [this](const PropertyList& properties) -> ReturnValue {
+                auto* face = static_cast<ValeraLcdDisplay*>(display_);
+                face->SetClockStyle(properties["look"].value<int>(),
+                                    properties["scale_pct"].value<int>(),
+                                    (uint32_t)properties["hh_color"].value<int>(),
+                                    (uint32_t)properties["mm_color"].value<int>());
+                return true;
+            });
+        mcp_server.AddTool(
+            "self.valera.radio_stations",
+            "Список проверенных российских интернет-радиостанций Valera (имя, жанр, URL, kbps).",
+            PropertyList(),
+            [](const PropertyList& properties) -> ReturnValue {
+                std::string out;
+                out.reserve(kValeraRadioStationCount * 96);
+                for (int i = 0; i < kValeraRadioStationCount; ++i) {
+                    const auto& s = kValeraRadioStations[i];
+                    if (i) out += "\n";
+                    out += s.name;
+                    out += " · ";
+                    out += s.genre;
+                    out += " · ";
+                    out += std::to_string(s.kbps);
+                    out += "kbps · ";
+                    out += s.url;
+                }
+                return out;
+            });
 #endif
     }
 

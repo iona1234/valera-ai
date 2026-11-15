@@ -2,10 +2,14 @@
 
 #include "display/lcd_display.h"
 
+#include <cstdint>
+
 // Round 466x466 Valera face.
-// Idle: clock <-> weather, occasional Sber-like play eyes.
-// Assistant face: large centered eyes + mouth spectrum (no text).
-// Assistant reply: full-screen readable text + soft AMOLED effects (no eyes).
+// Idle: Popka Stack clock <-> weather, occasional Sber-like play eyes.
+// Listen: cyan eyes + symmetric living mouth EQ (no text).
+// Think: violet eyes + softer mouth EQ.
+// Speak/reply: frameless text + coral living voice bars (different UI from listen).
+// Wi-Fi: hotspot provisioning instructions (XiaoZhi AP).
 // 16 ms LVGL timer; no DisplayLockGuard in Tick.
 class ValeraLcdDisplay : public SpiLcdDisplay {
 public:
@@ -25,11 +29,17 @@ public:
     void SetPowerSaveMode(bool on) override;
     void SetTheme(Theme* theme) override;
 
+    // Clock look: 0=Stack, 1=Neon, 2=Soft. Scale percent 80..160.
+    void SetClockStyle(int look, int scale_pct, uint32_t hh_color, uint32_t mm_color);
+    void LoadClockStyle();
+
     static void RounderEventCb(lv_event_t* e);
 
 private:
     enum class ActiveMode { kIdle, kListen, kSpeak, kThink, kWifi, kSleep };
     enum class IdlePage { kClock, kWeather, kPlay };
+
+    static constexpr int kSpectrumN = 11;  // odd → perfect center bar, L↔R mirror
 
     struct Eye {
         lv_obj_t* body = nullptr;
@@ -43,6 +53,8 @@ private:
     void Tick();
     void BuildFace();
     void BuildEye(Eye* eye, int16_t cx, int16_t cy, int16_t w, int16_t h, int16_t pupil_r);
+    void BuildSpectrum(lv_obj_t** bars, lv_obj_t** track, int* track_n, int track_cap, int cy,
+                       lv_color_t color);
     void HideStockChrome();
 
     void SetActiveMode(ActiveMode mode);
@@ -52,15 +64,19 @@ private:
     void ApplyCaption();
     void SyncActiveStage();
     bool InReplyStage() const;
+    bool InWifiStage() const;
 
     void PaintClock(const struct tm* tm, bool colon_on);
     void PaintWeather();
+    void PaintWifiHint();
+    void ApplyClockStyleVisual();
     void SetGroupHidden(lv_obj_t* const* objs, int n, bool hidden);
 
     void AnimateAmbient();
     void AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, int16_t pupil_r, bool playful);
     void AnimatePlayFx();
-    void AnimateSpectrum();
+    void AnimateSpectrum(lv_obj_t* const* bars, float drive, float speed, lv_color_t c0,
+                         lv_color_t c1);
     void AnimateReplyFx();
     void PickGazeTarget(float max_x, float max_y);
     void PlacePupil(Eye* eye, int16_t w, int16_t h, int16_t pupil_r, float look_x, float look_y,
@@ -69,21 +85,24 @@ private:
     lv_obj_t* root_ = nullptr;
     lv_obj_t* bezel_ = nullptr;
 
-    // Popka Stack clock: solid HH (white) over MM (coral); edge weather/date.
+    // Popka Stack clock (solid labels + zoom).
     lv_obj_t* time_hh_label_ = nullptr;
     lv_obj_t* time_mm_label_ = nullptr;
     lv_obj_t* clock_edge_weather_ = nullptr;
     lv_obj_t* clock_edge_date_ = nullptr;
     lv_obj_t* clock_objs_[16] = {};
     int clock_obj_n_ = 0;
+    int clock_look_ = 0;
+    int clock_scale_pct_ = 100;
+    uint32_t clock_hh_color_ = 0xFFFFFF;
+    uint32_t clock_mm_color_ = 0xFF8FA3;
 
+    // Weather: large readable labels (Popka-like).
     lv_obj_t* weather_glyph_ = nullptr;
-    lv_obj_t* weather_out_seg_[2][7] = {};
-    lv_obj_t* weather_out_minus_ = nullptr;
-    lv_obj_t* weather_out_dot_ = nullptr;
-    lv_obj_t* weather_room_seg_[2][7] = {};
-    lv_obj_t* weather_room_dot_ = nullptr;
-    lv_obj_t* weather_objs_[40] = {};
+    lv_obj_t* weather_out_label_ = nullptr;
+    lv_obj_t* weather_room_label_ = nullptr;
+    lv_obj_t* weather_cond_label_ = nullptr;
+    lv_obj_t* weather_objs_[16] = {};
     int weather_obj_n_ = 0;
 
     Eye play_left_{};
@@ -97,25 +116,32 @@ private:
     int16_t play_eye_h_ = 74;
     int16_t play_pupil_r_ = 20;
 
-    // Assistant face stage: eyes + mouth spectrum.
+    // Listen/think face: eyes + mouth spectrum.
     Eye act_left_{};
     Eye act_right_{};
-    lv_obj_t* spectrum_[12] = {};
-    lv_obj_t* face_objs_[30] = {};
+    lv_obj_t* spectrum_[kSpectrumN] = {};
+    lv_obj_t* face_objs_[40] = {};
     int face_obj_n_ = 0;
     int16_t act_eye_w_ = 128;
     int16_t act_eye_h_ = 80;
     int16_t act_pupil_r_ = 22;
     int16_t act_eye_cy_ = 180;
-    int16_t spectrum_center_y_ = 320;  // mouth midline; bars grow up+down
+    int16_t spectrum_center_y_ = 320;
 
-    // Assistant reply stage: large text + soft ambient (no border frame).
-    lv_obj_t* reply_ring_ = nullptr;
-    lv_obj_t* reply_ring2_ = nullptr;
+    // Reply: text + coral voice EQ (same geometry as mouth, different color/role).
     lv_obj_t* reply_orb_[6] = {};
+    lv_obj_t* voice_eq_[kSpectrumN] = {};
     lv_obj_t* caption_label_ = nullptr;
-    lv_obj_t* reply_objs_[20] = {};
+    lv_obj_t* reply_objs_[40] = {};
     int reply_obj_n_ = 0;
+    int16_t voice_eq_cy_ = 390;
+
+    // Wi-Fi hotspot screen.
+    lv_obj_t* wifi_title_ = nullptr;
+    lv_obj_t* wifi_ssid_ = nullptr;
+    lv_obj_t* wifi_hint_ = nullptr;
+    lv_obj_t* wifi_objs_[12] = {};
+    int wifi_obj_n_ = 0;
 
     lv_timer_t* timer_ = nullptr;
 
@@ -124,7 +150,8 @@ private:
     bool assistant_active_ = false;
     bool caption_dirty_ = false;
     bool has_caption_ = false;
-    char caption_text_[256] = {};
+    char caption_text_[384] = {};
+    char emotion_name_[32] = "neutral";
     int tick_ = 0;
     int idle_page_ticks_ = 0;
     int idle_step_ = 0;

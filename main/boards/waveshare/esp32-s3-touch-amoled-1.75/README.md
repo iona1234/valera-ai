@@ -20,6 +20,19 @@ python3 scripts/build.py waveshare/esp32-s3-touch-amoled-1.75 \
 | app | 0x20000 |
 | assets | 0x800000 |
 
+## Wi‑Fi (первый boot)
+
+Как в остальных XiaoZhi `WifiBoard`:
+
+1. Если в NVS уже есть SSID — станция подключается сама.
+2. Если SSID нет (или таймаут / длинное BOOT) — hotspot provisioning:
+   точка `Xiaozhi-XXXX` → браузер (обычно `http://192.168.4.1`) → выбор сети.
+3. На плате Valera включено `CONFIG_USE_HOTSPOT_WIFI_PROVISIONING=y`
+   (BluFi выключен). Экран лица в `WifiConfiguring` / `Starting` / `Connecting`
+   показывает SSID точки и URL — не прячется в status bar.
+4. MCP `self.system.reconfigure_wifi` и длинное BOOT снова входят в настройку.
+   Cold boot **не** стирает сохранённый Wi‑Fi.
+
 ## Русское пробуждение «Валера» (бесплатно)
 
 Локальный детектор `USE_VALERA_RU_LOCAL_EAR`: AFE mono → MFCC → DTW по вшитым русским TTS-шаблонам «Валера» → `WakeWordInvoke`.
@@ -48,26 +61,53 @@ PWR читается с TCA9554 EXIO4 (`SYS_OUT`), BOOT — GPIO0.
 
 Когда Espressif пришлёт `wn10_ru_valera`, можно перейти на WakeNet (см. `wake_models/README.txt`).
 
-## Циферблат 60 fps
+## Циферблат и лицо (Popka + Sber)
 
 Визуал и структура окон — как у [PopkaStudio](https://github.com/PopaSpinka/PopkaStudio)
 (автор разрешил использовать код; проект некоммерческий).
 
-**Сейчас:** Stack-часы (сплошные HH белые / MM coral), погода, игривые глаза,
-голос (слушает → думает → ответ без рамки).
+**Idle:** Stack-часы (HH / MM) ↔ крупная погода ↔ playful-глаза.
 
-**План (как карта Popka):** радио Poster + Browse + громкость, shade быстрых
-настроек, галерея приложений. Интерактивный предпросмотр:
-[`ui-preview.html`](./ui-preview.html) (скриншоты `ui-preview-*.webp`).
+**Стиль часов** (NVS `valera` + MCP `self.valera.clock_style`):
+
+| look | вид |
+| --- | --- |
+| 0 Stack | белые HH / coral MM, свой `hh_color`/`mm_color` |
+| 1 Neon | cyan / magenta |
+| 2 Soft | светло-розовые / coral |
+| `scale_pct` | 80…160 (масштаб через LVGL zoom) |
+
+**Слушает ≠ отвечает:**
+
+| стадия | UI |
+| --- | --- |
+| Listen | глаза + **cyan** рот-EQ, 11 симметричных столбиков (L↔R mirror) |
+| Think | глаза + violet/magenta EQ, медленнее |
+| Speak | текст без рамки + **coral/magenta** voice-EQ (та же геометрия 11 баров) |
+
+Эмоции (`SetEmotion`) только двигают взгляд/прищур — **не** ломают стадии устройства.
+
+**Sber-подобные эффекты (да, реализованы):** idle-страница `kPlay` —
+двойные дыхающие кольца (`play_ring_` / `play_ring2_`), орбитальные орбы,
+мягкая «смывка» цвета глаз cyan↔magenta и лёгкий прищур. Это screensaver в
+цикле простоя, не отдельный платёжный UI.
+
+Предпросмотр: [`ui-preview.html`](./ui-preview.html), скрины `ui-screens/`.
 
 ```
-Циферблат ──► Погода / Глаза idle / Shade↓ / Радио / Галерея
-Wake «Валера» ──► Слушает ──► Думает ──► Ответ ──► idle
+Циферблат ──► Погода / Глаза(Sber) / Shade↓ / Радио / Галерея
+Wake «Валера» ──► Слушает(cyan EQ) ──► Думает ──► Ответ(coral EQ) ──► idle
 Радио ──► Станции (папки, скролл Popka) / Громкость
+Wi‑Fi ──► hotspot Xiaozhi-XXXX → браузер
 ```
 
-Российские пресеты (проверенные HTTP 200): `valera_radio_stations.h`
-(Наше, Европа Плюс, Maximum, DFM, Hit FM, Record, Вести FM, Маяк…).
+### Российское радио
+
+Пресеты (проверены HTTP 200 + `audio/*`, 2026-11-15): `valera_radio_stations.h`
+— 23 станции, только РФ (Наше, Европа Плюс, Русское, Maximum, DFM, Hit FM,
+Record*, Монте-Карло, Ретро FM, Дорожное, Шансон, Серебряный Дождь, Вести FM, Маяк…).
+Иностранные/Paradise убраны. MCP: `self.valera.radio_stations`.
+Декод потока в UI — отдельный этап; пресеты уже в прошивке.
 
 ### Память Flash (16 МБ)
 

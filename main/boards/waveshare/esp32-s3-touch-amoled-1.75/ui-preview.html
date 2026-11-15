@@ -3,750 +3,417 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Valera · структура окон · AMOLED 1.75</title>
+<title>Valera · все окна · AMOLED 1.75</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: #07080c;
-    --panel: #10131a;
-    --line: #1e2430;
-    --text: #e8edf4;
-    --muted: #8b95a8;
-    --coral: #FF8FA3;
-    --orange: #FF8A3D;
-    --cyan: #5EEAD4;
-    --dim: #9E9E9E;
+    --bg:#07080c; --panel:#10131a; --line:#1e2430; --text:#e8edf4;
+    --muted:#8b95a8; --coral:#FF8FA3; --orange:#FF8A3D; --cyan:#5EEAD4;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: "Outfit", sans-serif;
-    background:
-      radial-gradient(900px 500px at 10% -10%, #1a1020 0%, transparent 55%),
-      radial-gradient(700px 400px at 100% 0%, #0d1a22 0%, transparent 50%),
-      var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-  }
-  header {
-    padding: 28px 28px 8px;
-    max-width: 1280px;
-    margin: 0 auto;
-  }
-  header h1 {
-    margin: 0 0 6px;
-    font-size: 28px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-  header p {
-    margin: 0;
-    color: var(--muted);
-    font-size: 15px;
-    line-height: 1.5;
-    max-width: 72ch;
-  }
-  .layout {
-    display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: 20px;
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 16px 28px 40px;
-  }
-  @media (max-width: 960px) {
-    .layout { grid-template-columns: 1fr; }
-  }
-  .tree, .stage {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 16px;
-  }
-  .tree { padding: 18px 16px 22px; }
-  .tree h2, .stage-head h2 {
-    margin: 0 0 14px;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-  .node {
-    position: relative;
-    margin-left: 12px;
-    padding-left: 14px;
-    border-left: 1px solid #2a3344;
-  }
-  .node.root { margin-left: 0; padding-left: 0; border-left: 0; }
-  .item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    text-align: left;
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--text);
-    border-radius: 10px;
-    padding: 8px 10px;
-    margin: 3px 0;
-    cursor: pointer;
-    font: inherit;
-    font-size: 14px;
-    font-weight: 500;
-  }
-  .item:hover { background: #161b26; }
-  .item.active {
-    background: #1a2230;
-    border-color: #314057;
-    color: #fff;
-  }
-  .dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #3a4558; flex: 0 0 auto;
-  }
-  .item.active .dot { background: var(--coral); }
-  .tag {
-    margin-left: auto;
-    font-size: 11px;
-    color: var(--muted);
-    font-weight: 500;
-  }
-  .tag.now { color: var(--cyan); }
-  .tag.soon { color: var(--orange); }
-  .note {
-    margin-top: 16px;
-    padding: 12px;
-    border-radius: 12px;
-    background: #0c1018;
-    border: 1px solid var(--line);
-    color: var(--muted);
-    font-size: 12.5px;
-    line-height: 1.55;
-  }
-  .stage { padding: 18px; }
-  .stage-head {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 14px;
-  }
-  .stage-head .title {
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-  .stage-head .desc {
-    color: var(--muted);
-    font-size: 13px;
-    max-width: 46ch;
-    line-height: 1.45;
-  }
-  .faces {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 18px;
-    align-items: start;
-  }
-  .face-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-  }
-  .watch {
-    width: min(100%, 280px);
-    aspect-ratio: 1;
-    border-radius: 50%;
-    background: #000;
-    position: relative;
-    overflow: hidden;
-    box-shadow:
-      0 0 0 10px #12151c,
-      0 0 0 11px #2a303c,
-      0 24px 48px rgba(0,0,0,.55);
-  }
-  .watch canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-  .caption {
-    font-size: 12px;
-    color: var(--muted);
-    text-align: center;
-    line-height: 1.4;
-  }
-  .map {
-    margin-top: 18px;
-    padding: 14px;
-    border-radius: 12px;
-    background: #0c1018;
-    border: 1px solid var(--line);
-    overflow-x: auto;
-  }
-  .map svg { display: block; min-width: 720px; width: 100%; height: auto; }
-  .map text { font-family: "Outfit", sans-serif; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Outfit,sans-serif;background:var(--bg);color:var(--text)}
+  header{padding:22px 24px 8px;max-width:1400px;margin:0 auto}
+  header h1{margin:0 0 6px;font-size:26px;font-weight:700;letter-spacing:-.02em}
+  header p{margin:0;color:var(--muted);font-size:14px;line-height:1.5;max-width:80ch}
+  .layout{display:grid;grid-template-columns:280px 1fr;gap:16px;max-width:1400px;margin:0 auto;padding:12px 24px 36px}
+  @media(max-width:960px){.layout{grid-template-columns:1fr}}
+  .tree,.stage{background:var(--panel);border:1px solid var(--line);border-radius:16px}
+  .tree{padding:14px}
+  .tree h2,.stage h2{margin:0 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border:1px solid transparent;color:var(--text);border-radius:10px;padding:8px 10px;margin:2px 0;cursor:pointer;font:inherit;font-size:14px;font-weight:500}
+  .item:hover{background:#161b26}
+  .item.active{background:#1a2230;border-color:#314057}
+  .dot{width:8px;height:8px;border-radius:50%;background:#3a4558;flex:0 0 auto}
+  .item.active .dot{background:var(--coral)}
+  .tag{margin-left:auto;font-size:11px;color:var(--muted)}
+  .tag.ru{color:var(--orange)}
+  .note{margin-top:12px;padding:10px;border-radius:12px;background:#0c1018;border:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.5}
+  .stage{padding:16px}
+  .title{font-size:20px;font-weight:700;margin-bottom:4px}
+  .desc{color:var(--muted);font-size:13px;margin-bottom:14px;max-width:56ch;line-height:1.45}
+  .watch-wrap{display:flex;justify-content:center;padding:8px 0 18px}
+  .watch{width:min(100%,300px);aspect-ratio:1;border-radius:50%;background:#000;overflow:hidden;position:relative;box-shadow:0 0 0 10px #12151c,0 0 0 11px #2a303c,0 24px 48px rgba(0,0,0,.55);touch-action:none}
+  .watch canvas{width:100%;height:100%;display:block}
+  .mem{margin-top:8px;padding:12px;border-radius:12px;background:#0c1018;border:1px solid var(--line);font-size:13px;line-height:1.55;color:#cfd7e6}
+  .mem b{color:#fff}
+  .grid{display:none;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:8px}
+  .grid.on{display:grid}
+  .grid .cell{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .grid .mini{width:100%;aspect-ratio:1;border-radius:50%;background:#000;overflow:hidden;box-shadow:0 0 0 6px #12151c}
+  .grid canvas{width:100%;height:100%;display:block}
+  .grid .lab{font-size:12px;color:var(--muted);text-align:center}
+  .hint{font-size:12px;color:var(--muted);text-align:center;margin-top:6px}
 </style>
 </head>
 <body>
 <header>
-  <h1>Valera · структура окон</h1>
+  <h1>Valera · все окна интерфейса</h1>
   <p>
-    Целевой визуал под Waveshare ESP32-S3-Touch-AMOLED-1.75 (466×466), в композиции PopkaStudio
-    (автор разрешил использовать код). Слева — дерево экранов, справа — предпросмотр.
+    Целевой UI под Waveshare ESP32-S3-Touch-AMOLED-1.75 (466×466). Радио — только проверенные
+    российские станции; список станций прокручивается как у Popka (карточки 410×104, сжатие у края круга).
   </p>
 </header>
-
 <div class="layout">
   <aside class="tree">
     <h2>Экраны</h2>
-    <div class="node root">
-      <button class="item active" data-screen="clock"><span class="dot"></span>Циферблат<span class="tag now">сейчас</span></button>
-      <div class="node">
-        <button class="item" data-screen="weather"><span class="dot"></span>Погода<span class="tag now">сейчас</span></button>
-        <button class="item" data-screen="play"><span class="dot"></span>Игривые глаза<span class="tag now">idle</span></button>
-        <button class="item" data-screen="shade"><span class="dot"></span>Быстрые настройки<span class="tag soon">план</span></button>
-      </div>
-      <button class="item" data-screen="listen"><span class="dot"></span>Слушает<span class="tag now">голос</span></button>
-      <button class="item" data-screen="think"><span class="dot"></span>Думает<span class="tag now">голос</span></button>
-      <button class="item" data-screen="speak"><span class="dot"></span>Ответ<span class="tag now">голос</span></button>
-      <button class="item" data-screen="radio"><span class="dot"></span>Радио<span class="tag soon">план</span></button>
-      <div class="node">
-        <button class="item" data-screen="stations"><span class="dot"></span>Станции / папки<span class="tag soon">план</span></button>
-        <button class="item" data-screen="volume"><span class="dot"></span>Громкость<span class="tag soon">план</span></button>
-      </div>
-      <button class="item" data-screen="gallery"><span class="dot"></span>Галерея приложений<span class="tag soon">план</span></button>
-    </div>
+    <button class="item active" data-s="clock"><span class="dot"></span>Циферблат</button>
+    <button class="item" data-s="weather"><span class="dot"></span>Погода</button>
+    <button class="item" data-s="play"><span class="dot"></span>Глаза idle</button>
+    <button class="item" data-s="shade"><span class="dot"></span>Shade ↓</button>
+    <button class="item" data-s="listen"><span class="dot"></span>Слушает</button>
+    <button class="item" data-s="think"><span class="dot"></span>Думает</button>
+    <button class="item" data-s="speak"><span class="dot"></span>Ответ</button>
+    <button class="item" data-s="radio"><span class="dot"></span>Радио<span class="tag ru">RU</span></button>
+    <button class="item" data-s="stations"><span class="dot"></span>Станции · скролл<span class="tag ru">Popka</span></button>
+    <button class="item" data-s="volume"><span class="dot"></span>Громкость</button>
+    <button class="item" data-s="gallery"><span class="dot"></span>Галерея</button>
+    <button class="item" data-s="all"><span class="dot"></span>Все окна сеткой</button>
     <div class="note">
-      <b style="color:#cfd7e6">Навигация (как у Popka)</b><br>
-      Idle: авто-цикл циферблат ↔ погода (+ иногда глаза).<br>
-      Голос: wake «Валера» → Слушает → Думает → Ответ → idle.<br>
-      Свайп / тап: позже — радио, shade, галерея.
+      Станции проверены HTTP 200 + audio/* (2026-11-15).<br>
+      На экране «Станции» тяни список вверх/вниз — скролл как у Popka.
     </div>
   </aside>
-
   <main class="stage">
-    <div class="stage-head">
-      <div>
-        <h2>Предпросмотр</h2>
-        <div class="title" id="screenTitle">Циферблат · Stack</div>
-        <div class="desc" id="screenDesc">Огромные HH над MM, без двоеточия. Белые часы, коралловые минуты. Подписи по дуге у обода.</div>
-      </div>
+    <h2>Предпросмотр</h2>
+    <div class="title" id="t">Циферблат · Stack</div>
+    <div class="desc" id="d">Сплошные HH / MM, подписи у края.</div>
+    <div class="watch-wrap" id="singleWrap">
+      <div class="watch" id="watch"><canvas id="c" width="466" height="466"></canvas></div>
     </div>
-    <div class="faces">
-      <div class="face-card">
-        <div class="watch"><canvas id="face" width="466" height="466"></canvas></div>
-        <div class="caption" id="faceCap">466×466 · true black AMOLED</div>
-      </div>
-      <div class="face-card" id="refCard" hidden>
-        <div class="watch"><canvas id="face2" width="466" height="466"></canvas></div>
-        <div class="caption" id="face2Cap"></div>
-      </div>
-    </div>
-
-    <div class="map" aria-label="Карта экранов">
-      <svg viewBox="0 0 900 320" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M0 0 L10 5 L0 10 z" fill="#4a5870"/>
-          </marker>
-        </defs>
-        <text x="20" y="28" fill="#8b95a8" font-size="12" font-weight="600" letter-spacing="1.5">КАРТА ОКОН · VALERA</text>
-
-        <!-- boxes -->
-        <g font-size="13" font-weight="600">
-          <rect x="355" y="50" width="190" height="54" rx="14" fill="#171c26" stroke="#FF8FA3" stroke-width="1.5"/>
-          <text x="450" y="82" text-anchor="middle" fill="#fff">Циферблат</text>
-
-          <rect x="40" y="150" width="150" height="44" rx="12" fill="#171c26" stroke="#2a3344"/>
-          <text x="115" y="177" text-anchor="middle" fill="#cfd7e6">Погода</text>
-
-          <rect x="210" y="150" width="150" height="44" rx="12" fill="#171c26" stroke="#2a3344"/>
-          <text x="285" y="177" text-anchor="middle" fill="#cfd7e6">Глаза idle</text>
-
-          <rect x="380" y="150" width="150" height="44" rx="12" fill="#171c26" stroke="#2a3344"/>
-          <text x="455" y="177" text-anchor="middle" fill="#cfd7e6">Shade ↓</text>
-
-          <rect x="550" y="150" width="150" height="44" rx="12" fill="#171c26" stroke="#FF8A3D"/>
-          <text x="625" y="177" text-anchor="middle" fill="#FFB98A">Радио</text>
-
-          <rect x="720" y="150" width="150" height="44" rx="12" fill="#171c26" stroke="#2a3344"/>
-          <text x="795" y="177" text-anchor="middle" fill="#cfd7e6">Галерея</text>
-
-          <rect x="210" y="240" width="130" height="40" rx="12" fill="#171c26" stroke="#5EEAD4"/>
-          <text x="275" y="265" text-anchor="middle" fill="#9af0e0">Слушает</text>
-          <rect x="360" y="240" width="130" height="40" rx="12" fill="#171c26" stroke="#5EEAD4"/>
-          <text x="425" y="265" text-anchor="middle" fill="#9af0e0">Думает</text>
-          <rect x="510" y="240" width="130" height="40" rx="12" fill="#171c26" stroke="#5EEAD4"/>
-          <text x="575" y="265" text-anchor="middle" fill="#9af0e0">Ответ</text>
-        </g>
-
-        <g stroke="#4a5870" stroke-width="1.4" fill="none" marker-end="url(#arrow)">
-          <path d="M400 104 C 280 120, 160 130, 115 150"/>
-          <path d="M430 104 C 360 120, 310 130, 285 150"/>
-          <path d="M450 104 L 455 150"/>
-          <path d="M500 104 C 560 120, 600 130, 625 150"/>
-          <path d="M520 104 C 650 120, 760 130, 795 150"/>
-          <path d="M450 104 C 450 180, 450 210, 275 240"/>
-          <path d="M275 280 L 360 260"/>
-          <path d="M425 280 L 510 260"/>
-          <path d="M575 240 C 575 200, 500 130, 450 104"/>
-        </g>
-        <text x="20" y="300" fill="#6b7588" font-size="11">коралл = текущий визуал · оранж = радио (следующий крупный шаг) · циан = голосовые стадии</text>
-      </svg>
+    <div class="hint" id="hint">466×466 · true black AMOLED</div>
+    <div class="grid" id="grid"></div>
+    <div class="mem">
+      <b>Память Flash 16 МБ (CI build 353e159 / waveshare-esp32-s3-touch-amoled-1.75):</b><br>
+      app <code>xiaozhi.bin</code> ≈ <b>3.05 МБ</b> из слота OTA <b>3.94 МБ</b> — свободно <b>~23%</b> (~0.92 МБ).<br>
+      assets ≈ <b>2.57 МБ</b> из раздела <b>8 МБ</b>. Bootloader ~15 КБ, запас есть.<br>
+      <b>Влезает.</b> Радио-пресеты — килобайты строк, на размер почти не влияют.<br>
+      <b>TF-карта:</b> на плате слот есть (SDMMC 1-bit: CMD=GPIO1, CLK=GPIO2, D0=GPIO3).
+      В текущей прошивке XiaoZhi/Valera карта ещё <b>не смонтирована</b> — можно добавить (музыка/кэш станций),
+      пины не конфликтуют с дисплеем/аудио.
     </div>
   </main>
 </div>
-
 <script>
+const STATIONS = [
+  {name:"Наше Радио", genre:"rock", color:"#E2483D", kbps:128},
+  {name:"Европа Плюс", genre:"hits", color:"#3E7BDB", kbps:128},
+  {name:"Европа Плюс Москва", genre:"hits", color:"#5FA8A0", kbps:128},
+  {name:"Maximum", genre:"rock", color:"#F2994A", kbps:96},
+  {name:"DFM", genre:"dance", color:"#9B5CFF", kbps:96},
+  {name:"Hit FM", genre:"hits", color:"#FF6A13", kbps:96},
+  {name:"Radio Record", genre:"dance", color:"#E6007E", kbps:96},
+  {name:"Record VIP House", genre:"dance", color:"#C9A0FF", kbps:96},
+  {name:"Record Techno", genre:"dance", color:"#0E8C8A", kbps:96},
+  {name:"Вести FM", genre:"news", color:"#2E6FE0", kbps:192},
+  {name:"Маяк", genre:"news", color:"#F5C400", kbps:192},
+];
+const FOLDERS = [
+  {t:"Избранное", s: STATIONS.length+" станций", c:"#FF8BCB"},
+  {t:"Хиты", s:"Европа · Hit FM · Maximum", c:"#FF8A3D"},
+  {t:"Танцы", s:"Record · DFM · VIP", c:"#7CC47F"},
+  {t:"Новости", s:"Вести FM · Маяк", c:"#8FB6FF"},
+];
 const META = {
-  clock: {
-    title: "Циферблат · Stack",
-    desc: "Как у автора на YouTube: HH белые сверху, MM коралловые снизу, без двоеточия. Дата/шаги и погода — по дуге у обода.",
-    cap: "Idle · главный экран",
-    dual: "radio",
-    dualCap: "Радио · целевой экран 2.1"
-  },
-  weather: {
-    title: "Погода",
-    desc: "Отдельный idle-экран: иконка состояния, уличная и комнатная температура (Open-Meteo + BME280).",
-    cap: "Idle · авто-цикл"
-  },
-  play: {
-    title: "Игривые глаза",
-    desc: "Короткий idle-экран в духе Sber: крупные глаза, мягкий rim, без текста.",
-    cap: "Idle · occasional"
-  },
-  shade: {
-    title: "Быстрые настройки",
-    desc: "Свайп вниз с циферблата (как Popka shade): яркость, громкость, Wi-Fi, Always On.",
-    cap: "План · overlay"
-  },
-  listen: {
-    title: "Слушает",
-    desc: "После wake «Валера»: только глаза + симметричный рот-спектр. Без текста и рамок.",
-    cap: "Голос · listening"
-  },
-  think: {
-    title: "Думает",
-    desc: "Та же морда, спокойнее анимация глаз/спектра, пока ждём ответ сервера.",
-    cap: "Голос · thinking"
-  },
-  speak: {
-    title: "Ответ",
-    desc: "Крупный текст на весь круг, без глаз и без pill/frame. Мягкие орбы у края.",
-    cap: "Голос · speaking"
-  },
-  radio: {
-    title: "Радио · Poster",
-    desc: "Как Popka 2.1: время сверху, станция, трек, STATIONS | VOLUME, Play/Stop у нижнего края, лучи-EQ по ободу.",
-    cap: "План · главный экран радио",
-    dual: "stations",
-    dualCap: "Browse · папки станций"
-  },
-  stations: {
-    title: "Станции",
-    desc: "Галерея-карточки папок (Top / жанры / страны / избранное) и список станций с сердечком.",
-    cap: "План · Browse"
-  },
-  volume: {
-    title: "Громкость",
-    desc: "Оверлей +/− вокруг динамика; тап снаружи или idle — закрыть.",
-    cap: "План · overlay"
-  },
-  gallery: {
-    title: "Галерея",
-    desc: "Список карточек приложений (погода, радио, about…). Карточки сжимаются у края круга.",
-    cap: "План · apps"
-  }
+  clock:{t:"Циферблат · Stack", d:"Огромные HH белые / MM coral, без двоеточия. Как у автора на YouTube."},
+  weather:{t:"Погода", d:"Улица (Open-Meteo) + комната (BME280, если подключён)."},
+  play:{t:"Глаза idle", d:"Короткий playful-экран в цикле простоя."},
+  shade:{t:"Быстрые настройки", d:"Свайп вниз: яркость, громкость, Wi‑Fi, Always On."},
+  listen:{t:"Слушает", d:"Глаза + зеркальный рот-спектр, без текста."},
+  think:{t:"Думает", d:"Та же морда, спокойнее анимация."},
+  speak:{t:"Ответ", d:"Крупный текст без глаз и без рамки."},
+  radio:{t:"Радио · Poster", d:"Российские станции, лучи-EQ, STATIONS / VOLUME, Play у края."},
+  stations:{t:"Станции · скролл Popka", d:"Карточки 410×104, сжатие/затухание у края круга, инерция. Тяни пальцем."},
+  volume:{t:"Громкость", d:"+/− вокруг динамика, дуга уровня."},
+  gallery:{t:"Галерея приложений", d:"Карточки приложений со скроллом как у Popka."},
+  all:{t:"Все окна", d:"Сетка скринов каждого экрана."},
 };
 
-const c1 = document.getElementById("face");
-const c2 = document.getElementById("face2");
-const ctx1 = c1.getContext("2d");
-const ctx2 = c2.getContext("2d");
-const W = 466, CX = 233, CY = 233;
-let screen = "clock";
-let t0 = performance.now();
+const W=466,CX=233,CY=233;
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let screen='clock', t0=performance.now();
+let scrollY=0, scrollV=0, dragging=false, lastY=0, lastTs=0;
+let stationMode='list'; // folders | list
 
-document.querySelectorAll(".item").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".item").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    screen = btn.dataset.screen;
-    const m = META[screen];
-    document.getElementById("screenTitle").textContent = m.title;
-    document.getElementById("screenDesc").textContent = m.desc;
-    document.getElementById("faceCap").textContent = m.cap;
-    const ref = document.getElementById("refCard");
-    if (m.dual) {
-      ref.hidden = false;
-      document.getElementById("face2Cap").textContent = m.dualCap;
-    } else ref.hidden = true;
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function rr(ctx,x,y,w,h,r){const R=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+R,y);ctx.arcTo(x+w,y,x+w,y+h,R);ctx.arcTo(x+w,y+h,x,y+h,R);ctx.arcTo(x,y+h,x,y,R);ctx.arcTo(x,y,x+w,y,R);ctx.closePath()}
+function clear(c){c.fillStyle='#000';c.beginPath();c.arc(CX,CY,233,0,Math.PI*2);c.fill();c.save();c.beginPath();c.arc(CX,CY,233,0,Math.PI*2);c.clip()}
+function unclip(c){c.restore()}
+function curved(c,text,radius,a0,a1,color,size,weight){
+  c.save();c.fillStyle=color;c.font=`${weight||600} ${size}px Outfit,sans-serif`;
+  const chars=[...text]; let total=0; const widths=chars.map(ch=>{const w=c.measureText(ch).width;total+=w;return w});
+  const span=a1-a0, dir=span>=0?1:-1, abs=Math.abs(span);
+  const needed=total/radius, scale=abs>0.01?Math.min(1,abs/needed):1;
+  const use=total*scale; let angle=a0+(span-dir*(use/radius))/2;
+  for(let i=0;i<chars.length;i++){
+    const w=widths[i]*scale; const a=angle+dir*(w/radius)/2;
+    const x=CX+Math.cos(a)*radius, y=CY+Math.sin(a)*radius;
+    c.save();c.translate(x,y);c.rotate(a+Math.PI/2*dir);c.textAlign='center';c.textBaseline='middle';c.fillText(chars[i],0,0);c.restore();
+    angle+=dir*(w/radius);
+  }
+  c.restore();
+}
+
+function drawClock(c){
+  clear(c);
+  c.fillStyle='#fff';
+  for(let i=0;i<28;i++){const a=i*2.4,r=60+(i*37)%160;c.globalAlpha=.08+(i%5)*.03;c.beginPath();c.arc(CX+Math.cos(a)*r,CY+Math.sin(a)*r,1.1,0,Math.PI*2);c.fill()}
+  c.globalAlpha=1;
+  const now=new Date();
+  c.textAlign='center';c.textBaseline='middle';
+  c.font='800 168px Outfit,sans-serif';
+  c.fillStyle='#fff';c.fillText(String(now.getHours()).padStart(2,'0'),CX,CY-78);
+  c.fillStyle='#FF8FA3';c.fillText(String(now.getMinutes()).padStart(2,'0'),CX,CY+78);
+  curved(c,'ПТ 15 НОЯ  ·  BARNAUL',208,Math.PI*.55,Math.PI*1.45,'#E8EDF4',15,600);
+  curved(c,'−12° ОБЛАЧНО',208,-Math.PI*.35,Math.PI*.35,'#FF8FA3',15,700);
+  unclip(c);
+}
+function drawWeather(c){
+  clear(c);
+  const g=c.createRadialGradient(CX,CY-110,4,CX,CY-110,40);g.addColorStop(0,'#FFE08A');g.addColorStop(1,'#F5A524');
+  c.fillStyle=g;c.beginPath();c.arc(CX,CY-110,28,0,Math.PI*2);c.fill();
+  c.textAlign='center';c.textBaseline='middle';
+  c.font='800 96px Outfit,sans-serif';c.fillStyle='#5EEAD4';c.fillText('−12°',CX,CY+10);
+  c.font='700 42px Outfit,sans-serif';c.fillStyle='#FF4DB8';c.fillText('24°',CX,CY+88);
+  c.font='600 16px Outfit,sans-serif';c.fillStyle='#8b95a8';c.fillText('улица · комната',CX,CY+128);
+  unclip(c);
+}
+function drawEyes(c,t,playful,listening){
+  clear(c);
+  const ew=118,eh=72*(listening?.92:.88),pr=20;
+  const lookX=Math.sin(t*.0017)*18, lookY=Math.cos(t*.0013)*8, cy=listening?180:210;
+  function eye(ecx){
+    rr(c,ecx-ew/2,cy-eh/2,ew,eh,eh/2);c.fillStyle=playful?'#7CFFB2':'#E8EDF4';c.fill();
+    c.save();rr(c,ecx-ew/2,cy-eh/2,ew,eh,eh/2);c.clip();
+    c.fillStyle='#0A0C10';c.beginPath();c.arc(ecx+lookX,cy+lookY,pr,0,Math.PI*2);c.fill();
+    c.fillStyle='#fff';c.globalAlpha=.85;c.beginPath();c.arc(ecx+lookX-6,cy+lookY-6,4,0,Math.PI*2);c.fill();
+    c.globalAlpha=1;c.restore();
+  }
+  eye(CX-78);eye(CX+78);
+  if(listening){
+    for(let i=0;i<11;i++){
+      const x=CX-90+i*18, h=8+Math.abs(Math.sin(t*.008+i*.55))*28+(i===5?10:0);
+      c.fillStyle=i%2?'#FF8FA3':'#5EEAD4';rr(c,x-5,320-h,10,h*2,5);c.fill();
+    }
+  } else if(playful){
+    c.strokeStyle='rgba(124,255,178,.25)';c.lineWidth=2;c.beginPath();c.arc(CX,CY,200,0,Math.PI*2);c.stroke();
+  }
+  unclip(c);
+}
+function drawSpeak(c,t){
+  clear(c);
+  for(let i=0;i<6;i++){
+    const a=t*.0007+i*1.05,R=195;
+    const x=CX+Math.cos(a)*R*(.78+.08*(i%2)), y=CY+Math.sin(a*.92)*R*(.78+.08*((i+1)%2));
+    c.globalAlpha=.12+.25*Math.abs(Math.sin(t*.002+i));
+    c.fillStyle=i%2?'#FF8FA3':'#5EEAD4';c.beginPath();c.arc(x,y,i%2?9:14,0,Math.PI*2);c.fill();
+  }
+  c.globalAlpha=1;c.fillStyle='#F4F7FB';c.textAlign='center';c.textBaseline='middle';c.font='600 28px Outfit,sans-serif';
+  ['Привет! Я Валера —','чем помочь?'].forEach((ln,i)=>c.fillText(ln,CX,CY-18+i*36));
+  unclip(c);
+}
+function drawRadio(c,t){
+  clear(c);
+  const st=STATIONS[0];
+  for(let side=0;side<2;side++)for(let i=0;i<23;i++){
+    const u=i/22, angDeg=side?(180+32-u*(96)):(-64+u*96), ang=angDeg*Math.PI/180;
+    const level=.15+.85*Math.abs(Math.sin(t*.01+i*.35+side));
+    const len=10+level*48,r0=224,r1=r0-len;
+    c.strokeStyle=`rgba(255,${Math.floor(185+70*level)},${Math.floor(140+80*level)},${.35+.65*level})`;
+    c.lineWidth=3;c.lineCap='round';
+    c.beginPath();c.moveTo(CX+Math.cos(ang)*r0,CY+Math.sin(ang)*r0);c.lineTo(CX+Math.cos(ang)*r1,CY+Math.sin(ang)*r1);c.stroke();
+  }
+  const now=new Date();
+  c.textAlign='center';c.textBaseline='middle';c.fillStyle='#FFF8EE';
+  c.font='700 22px Outfit,sans-serif';c.fillText(`${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`,CX,34);
+  c.font='800 34px Outfit,sans-serif';c.fillText(st.name,CX,140);
+  c.font='500 16px Outfit,sans-serif';c.fillStyle='#9E9E9E';c.fillText(st.genre+' · RU',CX,172);
+  c.fillStyle='#FFF8EE';c.font='500 15px Outfit,sans-serif';
+  c.save();c.beginPath();rr(c,CX-140,228,280,22,8);c.clip();
+  const song='  ·  живой эфир · проверенный поток  ·  ';
+  c.fillText(song+song,CX+140-((t/30)%600),240);c.restore();
+  c.fillStyle='#FF8A3D';c.font='700 12px Outfit,sans-serif';
+  c.fillText('☰',CX-65,288);c.fillText('СТАНЦИИ',CX-65,312);
+  c.fillText('🔊',CX+65,288);c.fillText('ГРОМКОСТЬ',CX+65,312);
+  c.strokeStyle='#FFF8EE';c.lineWidth=1;c.globalAlpha=.5;c.beginPath();c.moveTo(CX,278);c.lineTo(CX,318);c.stroke();c.globalAlpha=1;
+  c.fillStyle='#FF8A3D';rr(c,CX-120,360,240,72,36);c.fill();
+  c.fillStyle='#2A1200';c.font='800 24px Outfit,sans-serif';c.fillText('■  Стоп',CX,398);
+  unclip(c);
+}
+function drawShade(c){
+  clear(c);c.globalAlpha=.25;c.textAlign='center';c.textBaseline='middle';
+  c.font='800 90px Outfit,sans-serif';c.fillStyle='#fff';c.fillText('15',CX,CY-40);c.fillStyle='#FF8FA3';c.fillText('22',CX,CY+50);c.globalAlpha=1;
+  rr(c,48,70,370,280,28);c.fillStyle='rgba(20,24,32,.92)';c.fill();
+  [['Яркость','▌▌▌▌▌░░'],['Громкость','▌▌▌▌░░░'],['Wi‑Fi','Valera-Home'],['Always On','15 с']].forEach((r,i)=>{
+    const y=110+i*55;c.textAlign='left';c.fillStyle='#9E9E9E';c.font='600 14px Outfit,sans-serif';c.fillText(r[0],78,y);
+    c.textAlign='right';c.fillStyle='#FFF8EE';c.font='600 16px Outfit,sans-serif';c.fillText(r[1],388,y);
   });
+  unclip(c);
+}
+function drawVolume(c){
+  clear(c);c.textAlign='center';c.textBaseline='middle';c.fillStyle='#FFF8EE';
+  c.font='800 48px Outfit,sans-serif';c.fillText('+',CX,110);
+  c.font='700 28px Outfit,sans-serif';c.fillText('🔊',CX,CY);
+  c.font='600 18px Outfit,sans-serif';c.fillStyle='#9E9E9E';c.fillText('72%',CX,CY+40);
+  c.fillStyle='#FFF8EE';c.font='800 48px Outfit,sans-serif';c.fillText('−',CX,360);
+  c.strokeStyle='#FF8A3D';c.lineWidth=6;c.lineCap='round';c.beginPath();c.arc(CX,CY,160,-Math.PI*.75,Math.PI*.15);c.stroke();
+  unclip(c);
+}
+
+// Popka gallery scroll: cards 410×104, shrink/fade at circle edges
+const CARD_H=104, CARD_W=410, CARD_GAP=8, HEAD_H=64;
+function listMetrics(){
+  const items = stationMode==='folders' ? FOLDERS : STATIONS.map(s=>({t:s.name,s:s.genre+' · '+s.kbps+' kbps',c:s.color}));
+  const contentH = HEAD_H + items.length*(CARD_H+CARD_GAP) + 40;
+  const maxScroll = Math.max(0, contentH - 420);
+  return {items, contentH, maxScroll};
+}
+function drawStations(c){
+  clear(c);
+  const {items, maxScroll} = listMetrics();
+  scrollY = clamp(scrollY, 0, maxScroll);
+  // title scrolls away
+  const titleK = clamp(1 - scrollY/80, 0, 1);
+  c.globalAlpha = titleK;
+  c.textAlign='center';c.textBaseline='middle';c.fillStyle='#FFF8EE';c.font='700 20px Outfit,sans-serif';
+  c.fillText(stationMode==='folders'?'Папки':'Станции RU', CX, 36 + scrollY*0.15);
+  c.globalAlpha=1;
+
+  let y = 70 - scrollY;
+  items.forEach((it,i)=>{
+    const mid = y + CARD_H/2;
+    // distance from center → scale/alpha like Popka/HaloWatch
+    const dist = Math.abs(mid - CY) / 200;
+    const scale = clamp(1 - dist*0.22, 0.72, 1);
+    const alpha = clamp(1 - dist*0.55, 0.25, 1);
+    const w = CARD_W * scale, h = CARD_H * scale;
+    const x = CX - w/2;
+    const yy = mid - h/2;
+    // only draw if intersects circle roughly
+    if (yy < 450 && yy+h > 20) {
+      c.save(); c.globalAlpha = alpha;
+      rr(c,x,yy,w,h,22*scale); c.fillStyle='#2E3034'; c.fill();
+      c.beginPath(); c.arc(x+40*scale, mid, 22*scale, 0, Math.PI*2); c.fillStyle=it.c; c.fill();
+      c.textAlign='left'; c.fillStyle='#FFF8EE'; c.font=`700 ${Math.round(20*scale)}px Outfit,sans-serif`;
+      c.fillText(it.t, x+74*scale, mid-10*scale);
+      c.fillStyle='#9E9E9E'; c.font=`500 ${Math.round(13*scale)}px Outfit,sans-serif`;
+      c.fillText(it.s, x+74*scale, mid+14*scale);
+      c.restore();
+    }
+    y += CARD_H + CARD_GAP;
+  });
+
+  // edge button "Играет"
+  c.fillStyle='#FF8A3D'; rr(c,CX-120,390,240,56,28); c.fill();
+  c.fillStyle='#2A1200'; c.font='800 18px Outfit,sans-serif'; c.textAlign='center'; c.textBaseline='middle';
+  c.fillText('▶  Наше Радио', CX, 418);
+  unclip(c);
+}
+function drawGallery(c){
+  clear(c);
+  c.textAlign='center';c.textBaseline='middle';c.fillStyle='#FFF8EE';c.font='700 22px Outfit,sans-serif';c.fillText('Приложения',CX,40);
+  const apps=[['Погода','☁','#5EEAD4'],['Радио RU','📻','#FF8A3D'],['About','ℹ','#8FB6FF']];
+  apps.forEach((a,i)=>{
+    const y=80+i*100, scale=i===0?1:i===1?.96:.88, alpha=i===0?1:i===1?.85:.55;
+    c.save();c.globalAlpha=alpha;c.translate(CX,y+44);c.scale(scale,scale);c.translate(-CX,-(y+44));
+    rr(c,28,y,410,88,22);c.fillStyle='#2E3034';c.fill();
+    c.beginPath();c.arc(78,y+44,26,0,Math.PI*2);c.fillStyle=a[2];c.fill();
+    c.textAlign='left';c.fillStyle='#FFF8EE';c.font='700 22px Outfit,sans-serif';c.fillText(a[0],120,y+48);
+    c.restore();
+  });
+  unclip(c);
+}
+
+function paint(name,c,t){
+  switch(name){
+    case 'clock': drawClock(c); break;
+    case 'weather': drawWeather(c); break;
+    case 'play': drawEyes(c,t,true,false); break;
+    case 'listen': drawEyes(c,t,false,true); break;
+    case 'think': drawEyes(c,t*.6,false,true); break;
+    case 'speak': drawSpeak(c,t); break;
+    case 'radio': drawRadio(c,t); break;
+    case 'stations': drawStations(c); break;
+    case 'volume': drawVolume(c); break;
+    case 'shade': drawShade(c); break;
+    case 'gallery': drawGallery(c); break;
+    default: drawClock(c);
+  }
+}
+
+const ALL=['clock','weather','play','shade','listen','think','speak','radio','stations','volume','gallery'];
+const grid=document.getElementById('grid');
+ALL.forEach(id=>{
+  const cell=document.createElement('div'); cell.className='cell';
+  const mini=document.createElement('div'); mini.className='mini';
+  const cv=document.createElement('canvas'); cv.width=466; cv.height=466; cv.dataset.s=id;
+  mini.appendChild(cv); cell.appendChild(mini);
+  const lab=document.createElement('div'); lab.className='lab'; lab.textContent=META[id].t; cell.appendChild(lab);
+  grid.appendChild(cell);
 });
 
-function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
-function roundRect(ctx,x,y,w,h,r){
-  const rr=Math.min(r,w/2,h/2);
-  ctx.beginPath();
-  ctx.moveTo(x+rr,y);
-  ctx.arcTo(x+w,y,x+w,y+h,rr);
-  ctx.arcTo(x+w,y+h,x,y+h,rr);
-  ctx.arcTo(x,y+h,x,y,rr);
-  ctx.arcTo(x,y,x+w,y,rr);
-  ctx.closePath();
-}
-function clear(ctx){
-  ctx.fillStyle="#000";
-  ctx.beginPath(); ctx.arc(CX,CY,233,0,Math.PI*2); ctx.fill();
-  ctx.save();
-  ctx.beginPath(); ctx.arc(CX,CY,233,0,Math.PI*2); ctx.clip();
-}
-function unclip(ctx){ ctx.restore(); }
+document.querySelectorAll('.item').forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll('.item').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    screen=btn.dataset.s;
+    const m=META[screen];
+    document.getElementById('t').textContent=m.t;
+    document.getElementById('d').textContent=m.d;
+    const all=screen==='all';
+    document.getElementById('singleWrap').style.display=all?'none':'flex';
+    document.getElementById('hint').style.display=all?'none':'block';
+    grid.classList.toggle('on', all);
+    if(screen==='stations'){ scrollY=0; scrollV=0; stationMode='list'; }
+  };
+});
 
-function curvedText(ctx, text, radius, startAngle, endAngle, color, size, weight){
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.font = `${weight||600} ${size}px Outfit, sans-serif`;
-  const chars = [...text];
-  let total = 0;
-  const widths = chars.map(ch => { const w = ctx.measureText(ch).width; total += w; return w; });
-  const span = endAngle - startAngle;
-  // place by arc length approximation
-  let angle = startAngle;
-  const dir = span >= 0 ? 1 : -1;
-  const absSpan = Math.abs(span);
-  const needed = total / radius;
-  const scale = absSpan > 0.01 ? Math.min(1, absSpan / needed) : 1;
-  const use = total * scale;
-  angle = startAngle + (span - dir * (use / radius)) / 2;
-  for (let i=0;i<chars.length;i++){
-    const w = widths[i] * scale;
-    const a = angle + dir * (w / radius) / 2;
-    const x = CX + Math.cos(a) * radius;
-    const y = CY + Math.sin(a) * radius;
-    ctx.save();
-    ctx.translate(x,y);
-    ctx.rotate(a + Math.PI/2 * dir);
-    ctx.textAlign="center";
-    ctx.textBaseline="middle";
-    ctx.fillText(chars[i], 0, 0);
-    ctx.restore();
-    angle += dir * (w / radius);
-  }
-  ctx.restore();
-}
-
-function drawStackClock(ctx, now){
-  clear(ctx);
-  // faint stars
-  ctx.fillStyle="#fff";
-  for(let i=0;i<28;i++){
-    const a=i*2.4, r=60+(i*37)%160;
-    ctx.globalAlpha = 0.08 + (i%5)*0.03;
-    ctx.beginPath();
-    ctx.arc(CX+Math.cos(a)*r, CY+Math.sin(a)*r, 1.1, 0, Math.PI*2);
-    ctx.fill();
-  }
-  ctx.globalAlpha=1;
-
-  const hh = String(now.getHours()).padStart(2,"0");
-  const mm = String(now.getMinutes()).padStart(2,"0");
-
-  ctx.textAlign="center";
-  ctx.textBaseline="middle";
-  ctx.font="800 168px Outfit, sans-serif";
-  ctx.fillStyle="#FFFFFF";
-  ctx.fillText(hh, CX, CY - 78);
-  ctx.fillStyle="#FF8FA3";
-  ctx.fillText(mm, CX, CY + 78);
-
-  // curved edges like YT: left date, right weather
-  curvedText(ctx, "FRI 13 NOV  ·  12 STEPS", 208, Math.PI*0.55, Math.PI*1.45, "#E8EDF4", 15, 600);
-  curvedText(ctx, "8° CLOUDY", 208, -Math.PI*0.35, Math.PI*0.35, "#FF8FA3", 15, 700);
-
-  unclip(ctx);
-}
-
-function drawWeather(ctx){
-  clear(ctx);
-  // sun
-  const g = ctx.createRadialGradient(CX, CY-110, 4, CX, CY-110, 40);
-  g.addColorStop(0,"#FFE08A"); g.addColorStop(1,"#F5A524");
-  ctx.fillStyle=g;
-  ctx.beginPath(); ctx.arc(CX, CY-110, 28, 0, Math.PI*2); ctx.fill();
-
-  ctx.textAlign="center"; ctx.textBaseline="middle";
-  ctx.font="800 96px Outfit, sans-serif";
-  ctx.fillStyle="#5EEAD4";
-  ctx.fillText("−12°", CX, CY+10);
-  ctx.font="700 42px Outfit, sans-serif";
-  ctx.fillStyle="#FF4DB8";
-  ctx.fillText("24°", CX, CY+88);
-  ctx.font="600 16px Outfit, sans-serif";
-  ctx.fillStyle="#8b95a8";
-  ctx.fillText("улица · комната", CX, CY+128);
-  unclip(ctx);
-}
-
-function drawEyes(ctx, t, playful, listening){
-  clear(ctx);
-  const open = listening ? 0.92 : 0.88;
-  const ew = 118, eh = 72 * open, pr = 20;
-  const lookX = Math.sin(t*0.0017)*18;
-  const lookY = Math.cos(t*0.0013)*8;
-  const cy = listening ? 180 : 210;
-
-  function eye(ecx){
-    roundRect(ctx, ecx-ew/2, cy-eh/2, ew, eh, eh/2);
-    ctx.fillStyle = playful ? "#7CFFB2" : "#E8EDF4";
-    ctx.fill();
-    ctx.save();
-    roundRect(ctx, ecx-ew/2, cy-eh/2, ew, eh, eh/2); ctx.clip();
-    ctx.fillStyle="#0A0C10";
-    ctx.beginPath(); ctx.arc(ecx+lookX, cy+lookY, pr, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle="#fff"; ctx.globalAlpha=.85;
-    ctx.beginPath(); ctx.arc(ecx+lookX-6, cy+lookY-6, 4, 0, Math.PI*2); ctx.fill();
-    ctx.globalAlpha=1; ctx.restore();
-  }
-  eye(CX-78); eye(CX+78);
-
-  if (listening) {
-    // mirrored mouth spectrum
-    const bands = 11;
-    for (let i=0;i<bands;i++){
-      const x = CX - 90 + i*18;
-      const h = 8 + Math.abs(Math.sin(t*0.008 + i*0.55))*28 + (i===5?10:0);
-      ctx.fillStyle = i%2 ? "#FF8FA3" : "#5EEAD4";
-      roundRect(ctx, x-5, 320-h, 10, h*2, 5);
-      ctx.fill();
-    }
-  } else if (playful) {
-    ctx.strokeStyle="rgba(124,255,178,.25)";
-    ctx.lineWidth=2;
-    ctx.beginPath(); ctx.arc(CX,CY,200,0,Math.PI*2); ctx.stroke();
-  }
-  unclip(ctx);
-}
-
-function drawSpeak(ctx, t){
-  clear(ctx);
-  for(let i=0;i<6;i++){
-    const a=t*0.0007+i*1.05, R=195;
-    const x=CX+Math.cos(a)*R*(.78+.08*(i%2));
-    const y=CY+Math.sin(a*.92)*R*(.78+.08*((i+1)%2));
-    ctx.globalAlpha=.12+.25*Math.abs(Math.sin(t*0.002+i));
-    ctx.fillStyle=i%2?"#FF8FA3":"#5EEAD4";
-    ctx.beginPath(); ctx.arc(x,y,i%2?9:14,0,Math.PI*2); ctx.fill();
-  }
-  ctx.globalAlpha=1;
-  ctx.fillStyle="#F4F7FB";
-  ctx.textAlign="center";
-  ctx.textBaseline="middle";
-  ctx.font="600 28px Outfit, sans-serif";
-  const lines = ["Привет! Я Валера —", "чем помочь?"];
-  lines.forEach((ln,i)=>ctx.fillText(ln, CX, CY - 18 + i*36));
-  unclip(ctx);
-}
-
-function drawRadio(ctx, t, playing){
-  clear(ctx);
-  // bezel EQ rays
-  const bands=23;
-  for(let side=0; side<2; side++){
-    for(let i=0;i<bands;i++){
-      const u=i/(bands-1);
-      const angDeg = side? (180+32 - u*(32+64)) : (-64 + u*(32+64));
-      const ang = angDeg * Math.PI/180;
-      const level = playing ? (0.15+0.85*Math.abs(Math.sin(t*0.01 + i*0.35 + side))) : 0.08;
-      const len = 10 + level*48;
-      const r0=224, r1=r0-len;
-      const x0=CX+Math.cos(ang)*r0, y0=CY+Math.sin(ang)*r0;
-      const x1=CX+Math.cos(ang)*r1, y1=CY+Math.sin(ang)*r1;
-      ctx.strokeStyle = playing
-        ? `rgba(255,${Math.floor(185+70*level)},${Math.floor(140+80*level)},${0.35+0.65*level})`
-        : "#3A3A40";
-      ctx.lineWidth = 3;
-      ctx.lineCap="round";
-      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
-    }
-  }
-
-  const now=new Date();
-  ctx.textAlign="center"; ctx.textBaseline="middle";
-  ctx.fillStyle="#FFF8EE";
-  ctx.font="700 22px Outfit, sans-serif";
-  ctx.fillText(`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`, CX, 34);
-
-  ctx.font="800 36px Outfit, sans-serif";
-  ctx.fillText("Radio Paradise", CX, 140);
-  ctx.font="500 16px Outfit, sans-serif";
-  ctx.fillStyle="#9E9E9E";
-  ctx.fillText("Eclectic", CX, 172);
-
-  // song marquee
-  ctx.fillStyle="#FFF8EE";
-  ctx.font="500 15px Outfit, sans-serif";
-  const song = "  ·  Pink Floyd — Comfortably Numb  ·  ";
-  const shift = ((t/30)%600);
-  ctx.save();
-  ctx.beginPath(); roundRect(ctx, CX-140, 228, 280, 22, 8); ctx.clip();
-  ctx.fillText(song+song, CX+140-shift, 240);
-  ctx.restore();
-
-  // STATIONS | VOLUME
-  ctx.fillStyle="#FF8A3D";
-  ctx.font="700 12px Outfit, sans-serif";
-  ctx.letterSpacing="2px";
-  ctx.fillText("☰", CX-65, 288);
-  ctx.fillText("STATIONS", CX-65, 312);
-  ctx.fillText("🔊", CX+65, 288);
-  ctx.fillText("VOLUME", CX+65, 312);
-  ctx.strokeStyle="#FFF8EE"; ctx.lineWidth=1; ctx.globalAlpha=.5;
-  ctx.beginPath(); ctx.moveTo(CX, 278); ctx.lineTo(CX, 318); ctx.stroke();
-  ctx.globalAlpha=1;
-
-  // edge play button
-  ctx.fillStyle="#FF8A3D";
-  roundRect(ctx, CX-120, 360, 240, 72, 36);
-  ctx.fill();
-  // clip bottom to circle-ish by covering outside already clipped
-  ctx.fillStyle="#2A1200";
-  ctx.font="800 24px Outfit, sans-serif";
-  ctx.fillText(playing ? "■  Stop" : "▶  Play", CX, 398);
-  unclip(ctx);
-}
-
-function drawStations(ctx){
-  clear(ctx);
-  ctx.textAlign="center"; ctx.textBaseline="middle";
-  ctx.fillStyle="#FFF8EE";
-  ctx.font="700 20px Outfit, sans-serif";
-  ctx.fillText("Stations", CX, 42);
-
-  const cards = [
-    {t:"Favourites", s:"12 stations", c:"#FF8BCB"},
-    {t:"Top voted", s:"Radio Browser", c:"#F2994A"},
-    {t:"Jazz", s:"tag", c:"#7CC47F"}
-  ];
-  cards.forEach((card,i)=>{
-    const y = 90 + i*100;
-    roundRect(ctx, 28, y, 410, 88, 22);
-    ctx.fillStyle="#2E3034"; ctx.fill();
-    ctx.beginPath(); ctx.arc(78, y+44, 26, 0, Math.PI*2);
-    ctx.fillStyle=card.c; ctx.fill();
-    ctx.textAlign="left";
-    ctx.fillStyle="#FFF8EE"; ctx.font="700 22px Outfit, sans-serif";
-    ctx.fillText(card.t, 120, y+36);
-    ctx.fillStyle="#9E9E9E"; ctx.font="500 15px Outfit, sans-serif";
-    ctx.fillText(card.s, 120, y+60);
-  });
-  unclip(ctx);
-}
-
-function drawVolume(ctx){
-  clear(ctx);
-  ctx.textAlign="center"; ctx.textBaseline="middle";
-  ctx.fillStyle="#FFF8EE";
-  ctx.font="800 48px Outfit, sans-serif";
-  ctx.fillText("+", CX, 110);
-  ctx.font="700 28px Outfit, sans-serif";
-  ctx.fillText("🔊", CX, CY);
-  ctx.font="600 18px Outfit, sans-serif";
-  ctx.fillStyle="#9E9E9E";
-  ctx.fillText("72%", CX, CY+40);
-  ctx.fillStyle="#FFF8EE";
-  ctx.font="800 48px Outfit, sans-serif";
-  ctx.fillText("−", CX, 360);
-  // arc
-  ctx.strokeStyle="#FF8A3D"; ctx.lineWidth=6; ctx.lineCap="round";
-  ctx.beginPath(); ctx.arc(CX,CY,160,-Math.PI*0.75, Math.PI*0.15); ctx.stroke();
-  unclip(ctx);
-}
-
-function drawShade(ctx){
-  clear(ctx);
-  // dimmed clock under
-  ctx.globalAlpha=.25;
-  ctx.textAlign="center"; ctx.textBaseline="middle";
-  ctx.font="800 90px Outfit, sans-serif";
-  ctx.fillStyle="#fff"; ctx.fillText("15", CX, CY-40);
-  ctx.fillStyle="#FF8FA3"; ctx.fillText("22", CX, CY+50);
-  ctx.globalAlpha=1;
-
-  roundRect(ctx, 48, 70, 370, 280, 28);
-  ctx.fillStyle="rgba(20,24,32,.92)"; ctx.fill();
-  const rows = [
-    ["Яркость", "▌▌▌▌▌░░"],
-    ["Громкость", "▌▌▌▌░░░"],
-    ["Wi‑Fi", "Valera-Home"],
-    ["Always On", "15 с"]
-  ];
-  rows.forEach((r,i)=>{
-    const y=110+i*55;
-    ctx.textAlign="left"; ctx.fillStyle="#9E9E9E"; ctx.font="600 14px Outfit, sans-serif";
-    ctx.fillText(r[0], 78, y);
-    ctx.textAlign="right"; ctx.fillStyle="#FFF8EE"; ctx.font="600 16px Outfit, sans-serif";
-    ctx.fillText(r[1], 388, y);
-  });
-  unclip(ctx);
-}
-
-function drawGallery(ctx){
-  clear(ctx);
-  ctx.textAlign="center"; ctx.textBaseline="middle";
-  ctx.fillStyle="#FFF8EE"; ctx.font="700 22px Outfit, sans-serif";
-  ctx.fillText("Apps", CX, 40);
-  const apps=[["Погода","☁"],["Радио","📻"],["About","ℹ"]];
-  apps.forEach((a,i)=>{
-    const y=80+i*100;
-    const scale = i===0?1: i===1?0.96:0.88;
-    const alpha = i===0?1: i===1?0.85:0.55;
-    ctx.save();
-    ctx.globalAlpha=alpha;
-    ctx.translate(CX, y+44); ctx.scale(scale,scale); ctx.translate(-CX, -(y+44));
-    roundRect(ctx, 28, y, 410, 88, 22);
-    ctx.fillStyle="#2E3034"; ctx.fill();
-    ctx.font="700 28px Outfit, sans-serif";
-    ctx.fillStyle="#FFF8EE";
-    ctx.textAlign="left";
-    ctx.fillText(a[1]+"  "+a[0], 56, y+48);
-    ctx.restore();
-  });
-  unclip(ctx);
-}
-
-function paint(name, ctx, t){
-  const now = new Date();
-  switch(name){
-    case "clock": drawStackClock(ctx, now); break;
-    case "weather": drawWeather(ctx); break;
-    case "play": drawEyes(ctx, t, true, false); break;
-    case "listen": drawEyes(ctx, t, false, true); break;
-    case "think": drawEyes(ctx, t*0.6, false, true); break;
-    case "speak": drawSpeak(ctx, t); break;
-    case "radio": drawRadio(ctx, t, true); break;
-    case "stations": drawStations(ctx); break;
-    case "volume": drawVolume(ctx); break;
-    case "shade": drawShade(ctx); break;
-    case "gallery": drawGallery(ctx); break;
-    default: drawStackClock(ctx, now);
-  }
-}
+// Popka-like drag scroll on stations
+const watch=document.getElementById('watch');
+watch.addEventListener('pointerdown',e=>{
+  if(screen!=='stations') return;
+  dragging=true; lastY=e.clientY; lastTs=performance.now(); scrollV=0;
+  watch.setPointerCapture(e.pointerId);
+});
+watch.addEventListener('pointermove',e=>{
+  if(!dragging||screen!=='stations') return;
+  const dy=e.clientY-lastY; const now=performance.now(); const dt=Math.max(1,now-lastTs);
+  // map pointer px on CSS watch to canvas units (~466)
+  const scale=466/watch.clientWidth;
+  scrollY -= dy*scale; scrollV = -dy*scale/(dt/16);
+  lastY=e.clientY; lastTs=now;
+  const {maxScroll}=listMetrics(); scrollY=clamp(scrollY,0,maxScroll);
+});
+watch.addEventListener('pointerup',()=>{dragging=false});
+watch.addEventListener('pointercancel',()=>{dragging=false});
+watch.addEventListener('dblclick',()=>{ if(screen==='stations') stationMode=stationMode==='list'?'folders':'list'; scrollY=0; });
 
 function frame(ts){
-  const t = ts - t0;
-  paint(screen, ctx1, t);
-  const m = META[screen];
-  if (m.dual) paint(m.dual, ctx2, t);
+  const t=ts-t0;
+  if(screen==='stations' && !dragging){
+    scrollY += scrollV; scrollV *= 0.92;
+    if(Math.abs(scrollV)<0.05) scrollV=0;
+    const {maxScroll}=listMetrics();
+    if(scrollY<0){scrollY*=0.7;scrollV*=0.5} // rubber
+    if(scrollY>maxScroll){scrollY=maxScroll+(scrollY-maxScroll)*0.7;scrollV*=0.5}
+    scrollY=clamp(scrollY,-40,maxScroll+40);
+  }
+  if(screen!=='all') paint(screen,ctx,t);
+  grid.querySelectorAll('canvas').forEach(cv=>{
+    paint(cv.dataset.s, cv.getContext('2d'), t);
+  });
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+
+// deep-link ?s=stations
+const qs=new URLSearchParams(location.search);
+if(qs.get('s')){
+  const b=[...document.querySelectorAll('.item')].find(x=>x.dataset.s===qs.get('s'));
+  if(b) b.click();
+}
 </script>
 </body>
 </html>

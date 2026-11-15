@@ -328,20 +328,17 @@ void ValeraLcdDisplay::BuildFace() {
     Track(face_objs_, &face_obj_n_, 30, act_left_.body);
     Track(face_objs_, &face_obj_n_, 30, act_right_.body);
 
-    // Mouth: compact equalizer under eyes (Sber-like "ротик").
-    spectrum_base_y_ = (int16_t)(act_eye_cy_ + act_eye_h_ / 2 + min_side * 0.10f);
-    const int bar_w = 14;
-    const int bar_gap = 8;
+    // Mouth equalizer: lower under eyes, L/R mirror, grows up+down from midline.
+    spectrum_center_y_ = (int16_t)(act_eye_cy_ + act_eye_h_ / 2 + min_side * 0.16f);
+    const int bar_w = 12;
+    const int bar_gap = 7;
     const int mouth_n = 12;
     const int mouth_total = mouth_n * bar_w + (mouth_n - 1) * bar_gap;
     const int mouth_ox = cx - mouth_total / 2;
     for (int i = 0; i < mouth_n; ++i) {
         spectrum_[i] = MakePlain(root_);
-        lv_obj_set_size(spectrum_[i], bar_w, 18);
-        // Mild smile curve: outer bars sit slightly higher.
-        const float t = (i - (mouth_n - 1) * 0.5f) / ((mouth_n - 1) * 0.5f);
-        const int smile = (int)(10.f * t * t);
-        lv_obj_set_pos(spectrum_[i], mouth_ox + i * (bar_w + bar_gap), spectrum_base_y_ + smile);
+        lv_obj_set_size(spectrum_[i], bar_w, 16);
+        lv_obj_set_pos(spectrum_[i], mouth_ox + i * (bar_w + bar_gap), spectrum_center_y_ - 8);
         lv_obj_set_style_radius(spectrum_[i], bar_w / 2, 0);
         lv_obj_set_style_bg_color(spectrum_[i], kCyan, 0);
         lv_obj_set_style_bg_opa(spectrum_[i], LV_OPA_COVER, 0);
@@ -707,22 +704,35 @@ void ValeraLcdDisplay::AnimatePlayFx() {
 }
 
 void ValeraLcdDisplay::AnimateSpectrum() {
-    // Mouth ladder under the eyes — listening / thinking / speaking envelopes.
-    for (int i = 0; i < 12; ++i) {
-        float phase = tick_ * 0.24f + i * 0.48f;
-        float env = 0.40f + 0.60f * fabsf(sinf(phase));
-        if (active_mode_ == ActiveMode::kListen) env = 0.30f + 0.70f * fabsf(sinf(phase));
-        else if (active_mode_ == ActiveMode::kThink)
-            env = 0.20f + 0.35f * fabsf(sinf(phase * 0.35f));
-        else if (active_mode_ == ActiveMode::kSpeak)
-            env = 0.35f + 0.65f * fabsf(sinf(phase * 1.15f));
-        const float t = (i - 5.5f) / 5.5f;
-        const int smile = (int)(10.f * t * t);
-        int h = 10 + (int)(56.f * env);
+    // Symmetric mouth: L↔R mirror envelope, bars expand equally up+down from midline.
+    constexpr int kN = 12;
+    constexpr float kHalfPi = 1.57079637f;
+    float drive = 0.55f;
+    float speed = 0.26f;
+    if (active_mode_ == ActiveMode::kListen) {
+        drive = 0.85f;
+        speed = 0.32f;
+    } else if (active_mode_ == ActiveMode::kThink) {
+        drive = 0.35f;
+        speed = 0.12f;
+    } else if (active_mode_ == ActiveMode::kSpeak) {
+        drive = 0.95f;
+        speed = 0.38f;
+    }
+
+    for (int i = 0; i < kN; ++i) {
+        const int mirror = (i < kN / 2) ? i : (kN - 1 - i);
+        // Edge→center→edge shape (same height at mirrored indices).
+        const float shape = 0.22f + 0.78f * sinf((mirror + 0.5f) / (kN / 2.f) * kHalfPi);
+        // Lively motion shared by mirrored pair so L/R stay identical.
+        const float wave =
+            0.45f + 0.55f * fabsf(sinf(tick_ * speed + mirror * 0.70f + 0.15f * sinf(tick_ * 0.07f)));
+        const float env = Clampf(shape * (0.35f + drive * wave), 0.12f, 1.f);
+        const int h = 12 + (int)(64.f * env);  // full height; half above, half below
         lv_obj_set_height(spectrum_[i], h);
-        lv_obj_set_y(spectrum_[i], spectrum_base_y_ + smile + 28 - h);
-        lv_obj_set_style_bg_color(spectrum_[i], (i % 2) ? kMagenta : kCyan, 0);
-        lv_obj_set_style_bg_opa(spectrum_[i], (lv_opa_t)(150 + (int)(90 * env)), 0);
+        lv_obj_set_y(spectrum_[i], spectrum_center_y_ - h / 2);
+        lv_obj_set_style_bg_color(spectrum_[i], (mirror % 2) ? kMagenta : kCyan, 0);
+        lv_obj_set_style_bg_opa(spectrum_[i], (lv_opa_t)(150 + (int)(95 * env)), 0);
     }
 }
 

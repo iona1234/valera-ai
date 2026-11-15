@@ -104,7 +104,7 @@ private:
     int16_t act_eye_h_ = 80;
     int16_t act_pupil_r_ = 22;
     int16_t act_eye_cy_ = 180;
-    int16_t spectrum_base_y_ = 300;
+    int16_t spectrum_center_y_ = 320;  // mouth midline; bars grow up+down
 
     // Assistant reply stage: large text + soft ambient (no border frame).
     lv_obj_t* reply_ring_ = nullptr;

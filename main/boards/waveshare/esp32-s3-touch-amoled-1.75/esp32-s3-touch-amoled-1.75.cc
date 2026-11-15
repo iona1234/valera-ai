@@ -4,6 +4,7 @@
 
 #include "codecs/box_audio_codec.h"
 #include "application.h"
+#include "assets/lang_config.h"
 #include "button.h"
 #include "led/single_led.h"
 #include "mcp_server.h"
@@ -15,6 +16,8 @@
 #include "valera_sensors.h"
 
 #include <esp_log.h>
+#include <esp_system.h>
+#include <esp_timer.h>
 #include <esp_lcd_panel_vendor.h>
 #include <driver/i2c_master.h>
 #include <driver/spi_master.h>
@@ -24,6 +27,7 @@
 #include <esp_lcd_touch_cst9217.h>
 #include <esp_lvgl_port.h>
 #include <lvgl.h>
+#include <string>
 
 #define TAG "WaveshareEsp32s3TouchAMOLED1inch75"
 
@@ -152,6 +156,10 @@ private:
     CustomBacklight* backlight_;
     esp_io_expander_handle_t io_expander = NULL;
     PowerSaveTimer* power_save_timer_;
+    esp_timer_handle_t pwr_poll_timer_ = nullptr;
+    bool pwr_pressed_ = false;
+    int64_t pwr_press_ms_ = 0;
+    bool pwr_long_fired_ = false;
 
     void InitializePowerSaveTimer() {
         power_save_timer_ = new PowerSaveTimer(-1, 60, 300);
@@ -205,6 +213,94 @@ private:
         ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO));
     }
 
+    void BumpVolume(int delta) {
+        auto codec = GetAudioCodec();
+        if (codec == nullptr) return;
+        int volume = codec->output_volume() + delta;
+        if (volume > 100) volume = 20;  // wrap quiet→usable after max
+        if (volume < 0) volume = 0;
+        codec->SetOutputVolume(volume);
+        GetDisplay()->ShowNotification(std::string(Lang::Strings::VOLUME) + std::to_string(volume));
+    }
+
+    void HandlePwrShortPress() {
+        // Wake from sleep first; otherwise step volume.
+        if (power_save_timer_) power_save_timer_->WakeUp();
+        SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
+        BumpVolume(+10);
+    }
+
+    void HandlePwrLongPress() {
+        ESP_LOGI(TAG, "PWR long press: soft PowerOff via AXP2101");
+        if (display_) {
+            display_->ClearChatMessages();
+            display_->SetPowerSaveMode(true);
+        }
+        if (pmic_) pmic_->PowerOff();
+    }
+
+    static void PwrPollThunk(void* arg) {
+        static_cast<WaveshareEsp32s3TouchAMOLED1inch75*>(arg)->PollPwrButton();
+    }
+
+    void PollPwrButton() {
+        if (io_expander == nullptr) return;
+        uint32_t level = 0;
+        // SYS_OUT on EXIO4: high while PWR pressed (Waveshare HW reference).
+        if (esp_io_expander_get_level(io_expander, IO_EXPANDER_PIN_NUM_4, &level) != ESP_OK) return;
+        const bool down = level != 0;
+        const int64_t now_ms = esp_timer_get_time() / 1000;
+
+        if (down && !pwr_pressed_) {
+            pwr_pressed_ = true;
+            pwr_press_ms_ = now_ms;
+            pwr_long_fired_ = false;
+            return;
+        }
+        if (down && pwr_pressed_ && !pwr_long_fired_) {
+            if (now_ms - pwr_press_ms_ >= 1800) {
+                pwr_long_fired_ = true;
+                HandlePwrLongPress();
+            }
+            return;
+        }
+        if (!down && pwr_pressed_) {
+            const int64_t held = now_ms - pwr_press_ms_;
+            pwr_pressed_ = false;
+            if (!pwr_long_fired_ && held >= 40 && held < 1800) HandlePwrShortPress();
+            pwr_long_fired_ = false;
+        }
+    }
+
+    void InitializePwrButtonMonitor() {
+        if (io_expander == nullptr) return;
+        const esp_timer_create_args_t args = {
+            .callback = &PwrPollThunk,
+            .arg = this,
+            .dispatch_method = ESP_TIMER_TASK,
+            .name = "valera_pwr",
+            .skip_unhandled_events = true,
+        };
+        if (esp_timer_create(&args, &pwr_poll_timer_) == ESP_OK) {
+            esp_timer_start_periodic(pwr_poll_timer_, 50 * 1000);  // 50 ms
+            ESP_LOGI(TAG, "PWR button monitor on TCA9554 EXIO4");
+        }
+    }
+
+    void InitializeColdBootHygiene() {
+        const esp_reset_reason_t reason = esp_reset_reason();
+        ESP_LOGI(TAG, "Reset reason=%d (power-cycle clears RAM; NVS Wi-Fi kept)", (int)reason);
+        // Cold / brownout / USB re-plug: start with a clean UI session.
+        // Do NOT erase NVS — that would wipe Wi-Fi credentials every unplug.
+        if (reason == ESP_RST_POWERON || reason == ESP_RST_BROWNOUT) {
+            if (display_) {
+                display_->ClearChatMessages();
+                display_->SetPowerSaveMode(false);
+            }
+            if (power_save_timer_) power_save_timer_->WakeUp();
+        }
+    }
+
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
@@ -212,6 +308,7 @@ private:
                 EnterWifiConfigMode();
                 return;
             }
+            if (power_save_timer_) power_save_timer_->WakeUp();
             app.ToggleChatState();
         });
 
@@ -227,6 +324,10 @@ private:
                 app.SetAecMode(app.GetAecMode() == kAecOff ? kAecOnDeviceSide : kAecOff);
             }
         });
+#endif
+
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+        InitializePwrButtonMonitor();
 #endif
     }
 
@@ -341,6 +442,7 @@ public:
 #if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
         ValeraSensors::Start();
 #endif
+        InitializeColdBootHygiene();
     }
 
     virtual AudioCodec* GetAudioCodec() override {

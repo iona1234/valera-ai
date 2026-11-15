@@ -644,7 +644,7 @@ void ValeraLcdDisplay::Tick() {
     if (idle_page_ == IdlePage::kClock) {
         time_t now = time(nullptr);
         ValeraClimate climate = ValeraSensors::Get();
-        if (climate.clock_fix_ok) now += climate.clock_offset_sec;
+        if (climate.clock_fix_ok) now += climate.clock_fix_sec;
         struct tm tm_info = {};
         localtime_r(&now, &tm_info);
         if (tm_info.tm_hour != last_hour_ || tm_info.tm_min != last_min_ ||

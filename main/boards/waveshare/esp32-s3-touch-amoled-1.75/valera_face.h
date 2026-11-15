@@ -69,11 +69,12 @@ private:
     lv_obj_t* root_ = nullptr;
     lv_obj_t* bezel_ = nullptr;
 
-    // Popka-inspired stacked HH / MM (no colon); edge captions for weather/date.
-    lv_obj_t* clock_seg_[4][7] = {};
+    // Popka Stack clock: solid HH (white) over MM (coral); edge weather/date.
+    lv_obj_t* time_hh_label_ = nullptr;
+    lv_obj_t* time_mm_label_ = nullptr;
     lv_obj_t* clock_edge_weather_ = nullptr;
     lv_obj_t* clock_edge_date_ = nullptr;
-    lv_obj_t* clock_objs_[40] = {};
+    lv_obj_t* clock_objs_[16] = {};
     int clock_obj_n_ = 0;
 
     lv_obj_t* weather_glyph_ = nullptr;

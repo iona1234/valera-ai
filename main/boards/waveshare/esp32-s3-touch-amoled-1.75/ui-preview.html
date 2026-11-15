@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Valera · структура окон · AMOLED 1.75</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #07080c;
+    --panel: #10131a;
+    --line: #1e2430;
+    --text: #e8edf4;
+    --muted: #8b95a8;
+    --coral: #FF8FA3;
+    --orange: #FF8A3D;
+    --cyan: #5EEAD4;
+    --dim: #9E9E9E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Outfit", sans-serif;
+    background:
+      radial-gradient(900px 500px at 10% -10%, #1a1020 0%, transparent 55%),
+      radial-gradient(700px 400px at 100% 0%, #0d1a22 0%, transparent 50%),
+      var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    padding: 28px 28px 8px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  header h1 {
+    margin: 0 0 6px;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  header p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.5;
+    max-width: 72ch;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 16px 28px 40px;
+  }
+  @media (max-width: 960px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .tree, .stage {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+  }
+  .tree { padding: 18px 16px 22px; }
+  .tree h2, .stage-head h2 {
+    margin: 0 0 14px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .node {
+    position: relative;
+    margin-left: 12px;
+    padding-left: 14px;
+    border-left: 1px solid #2a3344;
+  }
+  .node.root { margin-left: 0; padding-left: 0; border-left: 0; }
+  .item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text);
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin: 3px 0;
+    cursor: pointer;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .item:hover { background: #161b26; }
+  .item.active {
+    background: #1a2230;
+    border-color: #314057;
+    color: #fff;
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #3a4558; flex: 0 0 auto;
+  }
+  .item.active .dot { background: var(--coral); }
+  .tag {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .tag.now { color: var(--cyan); }
+  .tag.soon { color: var(--orange); }
+  .note {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 12px;
+    background: #0c1018;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  .stage { padding: 18px; }
+  .stage-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .stage-head .title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .stage-head .desc {
+    color: var(--muted);
+    font-size: 13px;
+    max-width: 46ch;
+    line-height: 1.45;
+  }
+  .faces {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+    align-items: start;
+  }
+  .face-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .watch {
+    width: min(100%, 280px);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: #000;
+    position: relative;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 10px #12151c,
+      0 0 0 11px #2a303c,
+      0 24px 48px rgba(0,0,0,.55);
+  }
+  .watch canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .caption {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.4;
+  }
+  .map {
+    margin-top: 18px;
+    padding: 14px;
+    border-radius: 12px;
+    background: #0c1018;
+    border: 1px solid var(--line);
+    overflow-x: auto;
+  }
+  .map svg { display: block; min-width: 720px; width: 100%; height: auto; }
+  .map text { font-family: "Outfit", sans-serif; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Valera · структура окон</h1>
+  <p>
+    Целевой визуал под Waveshare ESP32-S3-Touch-AMOLED-1.75 (466×466), в композиции PopkaStudio
+    (автор разрешил использовать код). Слева — дерево экранов, справа — предпросмотр.
+  </p>
+</header>
+
+<div class="layout">
+  <aside class="tree">
+    <h2>Экраны</h2>
+    <div class="node root">
+      <button class="item active" data-screen="clock"><span class="dot"></span>Циферблат<span class="tag now">сейчас</span></button>
+      <div class="node">
+        <button class="item" data-screen="weather"><span class="dot"></span>Погода<span class="tag now">сейчас</span></button>
+        <button class="item" data-screen="play"><span class="dot"></span>Игривые глаза<span class="tag now">idle</span></button>
+        <button class="item" data-screen="shade"><span class="dot"></span>Быстрые настройки<span class="tag soon">план</span></button>
+      </div>
+      <button class="item" data-screen="listen"><span class="dot"></span>Слушает<span class="tag now">голос</span></button>
+      <button class="item" data-screen="think"><span class="dot"></span>Думает<span class="tag now">голос</span></button>
+      <button class="item" data-screen="speak"><span class="dot"></span>Ответ<span class="tag now">голос</span></button>
+      <button class="item" data-screen="radio"><span class="dot"></span>Радио<span class="tag soon">план</span></button>
+      <div class="node">
+        <button class="item" data-screen="stations"><span class="dot"></span>Станции / папки<span class="tag soon">план</span></button>
+        <button class="item" data-screen="volume"><span class="dot"></span>Громкость<span class="tag soon">план</span></button>
+      </div>
+      <button class="item" data-screen="gallery"><span class="dot"></span>Галерея приложений<span class="tag soon">план</span></button>
+    </div>
+    <div class="note">
+      <b style="color:#cfd7e6">Навигация (как у Popka)</b><br>
+      Idle: авто-цикл циферблат ↔ погода (+ иногда глаза).<br>
+      Голос: wake «Валера» → Слушает → Думает → Ответ → idle.<br>
+      Свайп / тап: позже — радио, shade, галерея.
+    </div>
+  </aside>
+
+  <main class="stage">
+    <div class="stage-head">
+      <div>
+        <h2>Предпросмотр</h2>
+        <div class="title" id="screenTitle">Циферблат · Stack</div>
+        <div class="desc" id="screenDesc">Огромные HH над MM, без двоеточия. Белые часы, коралловые минуты. Подписи по дуге у обода.</div>
+      </div>
+    </div>
+    <div class="faces">
+      <div class="face-card">
+        <div class="watch"><canvas id="face" width="466" height="466"></canvas></div>
+        <div class="caption" id="faceCap">466×466 · true black AMOLED</div>
+      </div>
+      <div class="face-card" id="refCard" hidden>
+        <div class="watch"><canvas id="face2" width="466" height="466"></canvas></div>
+        <div class="caption" id="face2Cap"></div>
+      </div>
+    </div>
+
+    <div class="map" aria-label="Карта экранов">
+      <svg viewBox="0 0 900 320" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#4a5870"/>
+          </marker>
+        </defs>
+        <text x="20" y="28" fill="#8b95a8" font-size="12" font-weight="600" letter-spacing="1.5">КАРТА ОКОН · VALERA</text>
+
+        <!-- boxes -->
+        <g font-size="13" font-weight="600">
+          <rect x="355" y="50" width="190" height="54" rx="14" fill="#171c26" stroke="#FF8FA3" stroke-width="1.5"/>
+          <text x="450" y="82" text-anchor="middle" fill="#fff">Циферблат</text>
+
+          <rect x="40" y="150" width="150" height="44" rx="12" fill="#171c26" stroke="#2a3344"/>
+          <text x="115" y="177" text-anchor="middle" fill="#cfd7e6">Погода</text>
+
+          <rect x="210" y="150" width="150" height="44" rx="12" fill="#171c26" stroke="#2a3344"/>
+          <text x="285" y="177" text-anchor="middle" fill="#cfd7e6">Глаза idle</text>
+
+          <rect x="380" y="150" width="150" height="44" rx="12" fill="#171c26" stroke="#2a3344"/>
+          <text x="455" y="177" text-anchor="middle" fill="#cfd7e6">Shade ↓</text>
+
+          <rect x="550" y="150" width="150" height="44" rx="12" fill="#171c26" stroke="#FF8A3D"/>
+          <text x="625" y="177" text-anchor="middle" fill="#FFB98A">Радио</text>
+
+          <rect x="720" y="150" width="150" height="44" rx="12" fill="#171c26" stroke="#2a3344"/>
+          <text x="795" y="177" text-anchor="middle" fill="#cfd7e6">Галерея</text>
+
+          <rect x="210" y="240" width="130" height="40" rx="12" fill="#171c26" stroke="#5EEAD4"/>
+          <text x="275" y="265" text-anchor="middle" fill="#9af0e0">Слушает</text>
+          <rect x="360" y="240" width="130" height="40" rx="12" fill="#171c26" stroke="#5EEAD4"/>
+          <text x="425" y="265" text-anchor="middle" fill="#9af0e0">Думает</text>
+          <rect x="510" y="240" width="130" height="40" rx="12" fill="#171c26" stroke="#5EEAD4"/>
+          <text x="575" y="265" text-anchor="middle" fill="#9af0e0">Ответ</text>
+        </g>
+
+        <g stroke="#4a5870" stroke-width="1.4" fill="none" marker-end="url(#arrow)">
+          <path d="M400 104 C 280 120, 160 130, 115 150"/>
+          <path d="M430 104 C 360 120, 310 130, 285 150"/>
+          <path d="M450 104 L 455 150"/>
+          <path d="M500 104 C 560 120, 600 130, 625 150"/>
+          <path d="M520 104 C 650 120, 760 130, 795 150"/>
+          <path d="M450 104 C 450 180, 450 210, 275 240"/>
+          <path d="M275 280 L 360 260"/>
+          <path d="M425 280 L 510 260"/>
+          <path d="M575 240 C 575 200, 500 130, 450 104"/>
+        </g>
+        <text x="20" y="300" fill="#6b7588" font-size="11">коралл = текущий визуал · оранж = радио (следующий крупный шаг) · циан = голосовые стадии</text>
+      </svg>
+    </div>
+  </main>
+</div>
+
+<script>
+const META = {
+  clock: {
+    title: "Циферблат · Stack",
+    desc: "Как у автора на YouTube: HH белые сверху, MM коралловые снизу, без двоеточия. Дата/шаги и погода — по дуге у обода.",
+    cap: "Idle · главный экран",
+    dual: "radio",
+    dualCap: "Радио · целевой экран 2.1"
+  },
+  weather: {
+    title: "Погода",
+    desc: "Отдельный idle-экран: иконка состояния, уличная и комнатная температура (Open-Meteo + BME280).",
+    cap: "Idle · авто-цикл"
+  },
+  play: {
+    title: "Игривые глаза",
+    desc: "Короткий idle-экран в духе Sber: крупные глаза, мягкий rim, без текста.",
+    cap: "Idle · occasional"
+  },
+  shade: {
+    title: "Быстрые настройки",
+    desc: "Свайп вниз с циферблата (как Popka shade): яркость, громкость, Wi-Fi, Always On.",
+    cap: "План · overlay"
+  },
+  listen: {
+    title: "Слушает",
+    desc: "После wake «Валера»: только глаза + симметричный рот-спектр. Без текста и рамок.",
+    cap: "Голос · listening"
+  },
+  think: {
+    title: "Думает",
+    desc: "Та же морда, спокойнее анимация глаз/спектра, пока ждём ответ сервера.",
+    cap: "Голос · thinking"
+  },
+  speak: {
+    title: "Ответ",
+    desc: "Крупный текст на весь круг, без глаз и без pill/frame. Мягкие орбы у края.",
+    cap: "Голос · speaking"
+  },
+  radio: {
+    title: "Радио · Poster",
+    desc: "Как Popka 2.1: время сверху, станция, трек, STATIONS | VOLUME, Play/Stop у нижнего края, лучи-EQ по ободу.",
+    cap: "План · главный экран радио",
+    dual: "stations",
+    dualCap: "Browse · папки станций"
+  },
+  stations: {
+    title: "Станции",
+    desc: "Галерея-карточки папок (Top / жанры / страны / избранное) и список станций с сердечком.",
+    cap: "План · Browse"
+  },
+  volume: {
+    title: "Громкость",
+    desc: "Оверлей +/− вокруг динамика; тап снаружи или idle — закрыть.",
+    cap: "План · overlay"
+  },
+  gallery: {
+    title: "Галерея",
+    desc: "Список карточек приложений (погода, радио, about…). Карточки сжимаются у края круга.",
+    cap: "План · apps"
+  }
+};
+
+const c1 = document.getElementById("face");
+const c2 = document.getElementById("face2");
+const ctx1 = c1.getContext("2d");
+const ctx2 = c2.getContext("2d");
+const W = 466, CX = 233, CY = 233;
+let screen = "clock";
+let t0 = performance.now();
+
+document.querySelectorAll(".item").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".item").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    screen = btn.dataset.screen;
+    const m = META[screen];
+    document.getElementById("screenTitle").textContent = m.title;
+    document.getElementById("screenDesc").textContent = m.desc;
+    document.getElementById("faceCap").textContent = m.cap;
+    const ref = document.getElementById("refCard");
+    if (m.dual) {
+      ref.hidden = false;
+      document.getElementById("face2Cap").textContent = m.dualCap;
+    } else ref.hidden = true;
+  });
+});
+
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function roundRect(ctx,x,y,w,h,r){
+  const rr=Math.min(r,w/2,h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+rr,y);
+  ctx.arcTo(x+w,y,x+w,y+h,rr);
+  ctx.arcTo(x+w,y+h,x,y+h,rr);
+  ctx.arcTo(x,y+h,x,y,rr);
+  ctx.arcTo(x,y,x+w,y,rr);
+  ctx.closePath();
+}
+function clear(ctx){
+  ctx.fillStyle="#000";
+  ctx.beginPath(); ctx.arc(CX,CY,233,0,Math.PI*2); ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(CX,CY,233,0,Math.PI*2); ctx.clip();
+}
+function unclip(ctx){ ctx.restore(); }
+
+function curvedText(ctx, text, radius, startAngle, endAngle, color, size, weight){
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.font = `${weight||600} ${size}px Outfit, sans-serif`;
+  const chars = [...text];
+  let total = 0;
+  const widths = chars.map(ch => { const w = ctx.measureText(ch).width; total += w; return w; });
+  const span = endAngle - startAngle;
+  // place by arc length approximation
+  let angle = startAngle;
+  const dir = span >= 0 ? 1 : -1;
+  const absSpan = Math.abs(span);
+  const needed = total / radius;
+  const scale = absSpan > 0.01 ? Math.min(1, absSpan / needed) : 1;
+  const use = total * scale;
+  angle = startAngle + (span - dir * (use / radius)) / 2;
+  for (let i=0;i<chars.length;i++){
+    const w = widths[i] * scale;
+    const a = angle + dir * (w / radius) / 2;
+    const x = CX + Math.cos(a) * radius;
+    const y = CY + Math.sin(a) * radius;
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(a + Math.PI/2 * dir);
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+    ctx.fillText(chars[i], 0, 0);
+    ctx.restore();
+    angle += dir * (w / radius);
+  }
+  ctx.restore();
+}
+
+function drawStackClock(ctx, now){
+  clear(ctx);
+  // faint stars
+  ctx.fillStyle="#fff";
+  for(let i=0;i<28;i++){
+    const a=i*2.4, r=60+(i*37)%160;
+    ctx.globalAlpha = 0.08 + (i%5)*0.03;
+    ctx.beginPath();
+    ctx.arc(CX+Math.cos(a)*r, CY+Math.sin(a)*r, 1.1, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  const hh = String(now.getHours()).padStart(2,"0");
+  const mm = String(now.getMinutes()).padStart(2,"0");
+
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
+  ctx.font="800 168px Outfit, sans-serif";
+  ctx.fillStyle="#FFFFFF";
+  ctx.fillText(hh, CX, CY - 78);
+  ctx.fillStyle="#FF8FA3";
+  ctx.fillText(mm, CX, CY + 78);
+
+  // curved edges like YT: left date, right weather
+  curvedText(ctx, "FRI 13 NOV  ·  12 STEPS", 208, Math.PI*0.55, Math.PI*1.45, "#E8EDF4", 15, 600);
+  curvedText(ctx, "8° CLOUDY", 208, -Math.PI*0.35, Math.PI*0.35, "#FF8FA3", 15, 700);
+
+  unclip(ctx);
+}
+
+function drawWeather(ctx){
+  clear(ctx);
+  // sun
+  const g = ctx.createRadialGradient(CX, CY-110, 4, CX, CY-110, 40);
+  g.addColorStop(0,"#FFE08A"); g.addColorStop(1,"#F5A524");
+  ctx.fillStyle=g;
+  ctx.beginPath(); ctx.arc(CX, CY-110, 28, 0, Math.PI*2); ctx.fill();
+
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.font="800 96px Outfit, sans-serif";
+  ctx.fillStyle="#5EEAD4";
+  ctx.fillText("−12°", CX, CY+10);
+  ctx.font="700 42px Outfit, sans-serif";
+  ctx.fillStyle="#FF4DB8";
+  ctx.fillText("24°", CX, CY+88);
+  ctx.font="600 16px Outfit, sans-serif";
+  ctx.fillStyle="#8b95a8";
+  ctx.fillText("улица · комната", CX, CY+128);
+  unclip(ctx);
+}
+
+function drawEyes(ctx, t, playful, listening){
+  clear(ctx);
+  const open = listening ? 0.92 : 0.88;
+  const ew = 118, eh = 72 * open, pr = 20;
+  const lookX = Math.sin(t*0.0017)*18;
+  const lookY = Math.cos(t*0.0013)*8;
+  const cy = listening ? 180 : 210;
+
+  function eye(ecx){
+    roundRect(ctx, ecx-ew/2, cy-eh/2, ew, eh, eh/2);
+    ctx.fillStyle = playful ? "#7CFFB2" : "#E8EDF4";
+    ctx.fill();
+    ctx.save();
+    roundRect(ctx, ecx-ew/2, cy-eh/2, ew, eh, eh/2); ctx.clip();
+    ctx.fillStyle="#0A0C10";
+    ctx.beginPath(); ctx.arc(ecx+lookX, cy+lookY, pr, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.globalAlpha=.85;
+    ctx.beginPath(); ctx.arc(ecx+lookX-6, cy+lookY-6, 4, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1; ctx.restore();
+  }
+  eye(CX-78); eye(CX+78);
+
+  if (listening) {
+    // mirrored mouth spectrum
+    const bands = 11;
+    for (let i=0;i<bands;i++){
+      const x = CX - 90 + i*18;
+      const h = 8 + Math.abs(Math.sin(t*0.008 + i*0.55))*28 + (i===5?10:0);
+      ctx.fillStyle = i%2 ? "#FF8FA3" : "#5EEAD4";
+      roundRect(ctx, x-5, 320-h, 10, h*2, 5);
+      ctx.fill();
+    }
+  } else if (playful) {
+    ctx.strokeStyle="rgba(124,255,178,.25)";
+    ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(CX,CY,200,0,Math.PI*2); ctx.stroke();
+  }
+  unclip(ctx);
+}
+
+function drawSpeak(ctx, t){
+  clear(ctx);
+  for(let i=0;i<6;i++){
+    const a=t*0.0007+i*1.05, R=195;
+    const x=CX+Math.cos(a)*R*(.78+.08*(i%2));
+    const y=CY+Math.sin(a*.92)*R*(.78+.08*((i+1)%2));
+    ctx.globalAlpha=.12+.25*Math.abs(Math.sin(t*0.002+i));
+    ctx.fillStyle=i%2?"#FF8FA3":"#5EEAD4";
+    ctx.beginPath(); ctx.arc(x,y,i%2?9:14,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  ctx.fillStyle="#F4F7FB";
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
+  ctx.font="600 28px Outfit, sans-serif";
+  const lines = ["Привет! Я Валера —", "чем помочь?"];
+  lines.forEach((ln,i)=>ctx.fillText(ln, CX, CY - 18 + i*36));
+  unclip(ctx);
+}
+
+function drawRadio(ctx, t, playing){
+  clear(ctx);
+  // bezel EQ rays
+  const bands=23;
+  for(let side=0; side<2; side++){
+    for(let i=0;i<bands;i++){
+      const u=i/(bands-1);
+      const angDeg = side? (180+32 - u*(32+64)) : (-64 + u*(32+64));
+      const ang = angDeg * Math.PI/180;
+      const level = playing ? (0.15+0.85*Math.abs(Math.sin(t*0.01 + i*0.35 + side))) : 0.08;
+      const len = 10 + level*48;
+      const r0=224, r1=r0-len;
+      const x0=CX+Math.cos(ang)*r0, y0=CY+Math.sin(ang)*r0;
+      const x1=CX+Math.cos(ang)*r1, y1=CY+Math.sin(ang)*r1;
+      ctx.strokeStyle = playing
+        ? `rgba(255,${Math.floor(185+70*level)},${Math.floor(140+80*level)},${0.35+0.65*level})`
+        : "#3A3A40";
+      ctx.lineWidth = 3;
+      ctx.lineCap="round";
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+    }
+  }
+
+  const now=new Date();
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillStyle="#FFF8EE";
+  ctx.font="700 22px Outfit, sans-serif";
+  ctx.fillText(`${now.getHours()}:${String(now.getMinutes()).padStart(2,"0")}`, CX, 34);
+
+  ctx.font="800 36px Outfit, sans-serif";
+  ctx.fillText("Radio Paradise", CX, 140);
+  ctx.font="500 16px Outfit, sans-serif";
+  ctx.fillStyle="#9E9E9E";
+  ctx.fillText("Eclectic", CX, 172);
+
+  // song marquee
+  ctx.fillStyle="#FFF8EE";
+  ctx.font="500 15px Outfit, sans-serif";
+  const song = "  ·  Pink Floyd — Comfortably Numb  ·  ";
+  const shift = ((t/30)%600);
+  ctx.save();
+  ctx.beginPath(); roundRect(ctx, CX-140, 228, 280, 22, 8); ctx.clip();
+  ctx.fillText(song+song, CX+140-shift, 240);
+  ctx.restore();
+
+  // STATIONS | VOLUME
+  ctx.fillStyle="#FF8A3D";
+  ctx.font="700 12px Outfit, sans-serif";
+  ctx.letterSpacing="2px";
+  ctx.fillText("☰", CX-65, 288);
+  ctx.fillText("STATIONS", CX-65, 312);
+  ctx.fillText("🔊", CX+65, 288);
+  ctx.fillText("VOLUME", CX+65, 312);
+  ctx.strokeStyle="#FFF8EE"; ctx.lineWidth=1; ctx.globalAlpha=.5;
+  ctx.beginPath(); ctx.moveTo(CX, 278); ctx.lineTo(CX, 318); ctx.stroke();
+  ctx.globalAlpha=1;
+
+  // edge play button
+  ctx.fillStyle="#FF8A3D";
+  roundRect(ctx, CX-120, 360, 240, 72, 36);
+  ctx.fill();
+  // clip bottom to circle-ish by covering outside already clipped
+  ctx.fillStyle="#2A1200";
+  ctx.font="800 24px Outfit, sans-serif";
+  ctx.fillText(playing ? "■  Stop" : "▶  Play", CX, 398);
+  unclip(ctx);
+}
+
+function drawStations(ctx){
+  clear(ctx);
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillStyle="#FFF8EE";
+  ctx.font="700 20px Outfit, sans-serif";
+  ctx.fillText("Stations", CX, 42);
+
+  const cards = [
+    {t:"Favourites", s:"12 stations", c:"#FF8BCB"},
+    {t:"Top voted", s:"Radio Browser", c:"#F2994A"},
+    {t:"Jazz", s:"tag", c:"#7CC47F"}
+  ];
+  cards.forEach((card,i)=>{
+    const y = 90 + i*100;
+    roundRect(ctx, 28, y, 410, 88, 22);
+    ctx.fillStyle="#2E3034"; ctx.fill();
+    ctx.beginPath(); ctx.arc(78, y+44, 26, 0, Math.PI*2);
+    ctx.fillStyle=card.c; ctx.fill();
+    ctx.textAlign="left";
+    ctx.fillStyle="#FFF8EE"; ctx.font="700 22px Outfit, sans-serif";
+    ctx.fillText(card.t, 120, y+36);
+    ctx.fillStyle="#9E9E9E"; ctx.font="500 15px Outfit, sans-serif";
+    ctx.fillText(card.s, 120, y+60);
+  });
+  unclip(ctx);
+}
+
+function drawVolume(ctx){
+  clear(ctx);
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillStyle="#FFF8EE";
+  ctx.font="800 48px Outfit, sans-serif";
+  ctx.fillText("+", CX, 110);
+  ctx.font="700 28px Outfit, sans-serif";
+  ctx.fillText("🔊", CX, CY);
+  ctx.font="600 18px Outfit, sans-serif";
+  ctx.fillStyle="#9E9E9E";
+  ctx.fillText("72%", CX, CY+40);
+  ctx.fillStyle="#FFF8EE";
+  ctx.font="800 48px Outfit, sans-serif";
+  ctx.fillText("−", CX, 360);
+  // arc
+  ctx.strokeStyle="#FF8A3D"; ctx.lineWidth=6; ctx.lineCap="round";
+  ctx.beginPath(); ctx.arc(CX,CY,160,-Math.PI*0.75, Math.PI*0.15); ctx.stroke();
+  unclip(ctx);
+}
+
+function drawShade(ctx){
+  clear(ctx);
+  // dimmed clock under
+  ctx.globalAlpha=.25;
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.font="800 90px Outfit, sans-serif";
+  ctx.fillStyle="#fff"; ctx.fillText("15", CX, CY-40);
+  ctx.fillStyle="#FF8FA3"; ctx.fillText("22", CX, CY+50);
+  ctx.globalAlpha=1;
+
+  roundRect(ctx, 48, 70, 370, 280, 28);
+  ctx.fillStyle="rgba(20,24,32,.92)"; ctx.fill();
+  const rows = [
+    ["Яркость", "▌▌▌▌▌░░"],
+    ["Громкость", "▌▌▌▌░░░"],
+    ["Wi‑Fi", "Valera-Home"],
+    ["Always On", "15 с"]
+  ];
+  rows.forEach((r,i)=>{
+    const y=110+i*55;
+    ctx.textAlign="left"; ctx.fillStyle="#9E9E9E"; ctx.font="600 14px Outfit, sans-serif";
+    ctx.fillText(r[0], 78, y);
+    ctx.textAlign="right"; ctx.fillStyle="#FFF8EE"; ctx.font="600 16px Outfit, sans-serif";
+    ctx.fillText(r[1], 388, y);
+  });
+  unclip(ctx);
+}
+
+function drawGallery(ctx){
+  clear(ctx);
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillStyle="#FFF8EE"; ctx.font="700 22px Outfit, sans-serif";
+  ctx.fillText("Apps", CX, 40);
+  const apps=[["Погода","☁"],["Радио","📻"],["About","ℹ"]];
+  apps.forEach((a,i)=>{
+    const y=80+i*100;
+    const scale = i===0?1: i===1?0.96:0.88;
+    const alpha = i===0?1: i===1?0.85:0.55;
+    ctx.save();
+    ctx.globalAlpha=alpha;
+    ctx.translate(CX, y+44); ctx.scale(scale,scale); ctx.translate(-CX, -(y+44));
+    roundRect(ctx, 28, y, 410, 88, 22);
+    ctx.fillStyle="#2E3034"; ctx.fill();
+    ctx.font="700 28px Outfit, sans-serif";
+    ctx.fillStyle="#FFF8EE";
+    ctx.textAlign="left";
+    ctx.fillText(a[1]+"  "+a[0], 56, y+48);
+    ctx.restore();
+  });
+  unclip(ctx);
+}
+
+function paint(name, ctx, t){
+  const now = new Date();
+  switch(name){
+    case "clock": drawStackClock(ctx, now); break;
+    case "weather": drawWeather(ctx); break;
+    case "play": drawEyes(ctx, t, true, false); break;
+    case "listen": drawEyes(ctx, t, false, true); break;
+    case "think": drawEyes(ctx, t*0.6, false, true); break;
+    case "speak": drawSpeak(ctx, t); break;
+    case "radio": drawRadio(ctx, t, true); break;
+    case "stations": drawStations(ctx); break;
+    case "volume": drawVolume(ctx); break;
+    case "shade": drawShade(ctx); break;
+    case "gallery": drawGallery(ctx); break;
+    default: drawStackClock(ctx, now);
+  }
+}
+
+function frame(ts){
+  const t = ts - t0;
+  paint(screen, ctx1, t);
+  const m = META[screen];
+  if (m.dual) paint(m.dual, ctx2, t);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

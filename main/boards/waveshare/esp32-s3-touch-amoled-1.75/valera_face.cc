@@ -220,36 +220,39 @@ void ValeraLcdDisplay::BuildFace() {
     lv_obj_set_style_border_color(bezel_, kCyanDim, 0);
     lv_obj_set_style_border_opa(bezel_, LV_OPA_30, 0);
 
-    // ── Clock (Popka-inspired): stacked HH over MM, edge captions ────────
-    // Huge two-row digits fill the round face; hours white, minutes coral.
-    const int c_dw = (int)(min_side * 0.30f);
-    const int c_dh = (int)(min_side * 0.34f);
-    const int c_th = (int)(c_dw * 0.20f);
-    const int c_gap = (int)(c_dw * 0.10f);
-    const int c_row = c_dw * 2 + c_gap;
-    const int c_ox = (W - c_row) / 2;
-    const int c_oy_h = (int)(H * 0.14f);
-    const int c_oy_m = c_oy_h + (int)(c_dh * 0.82f);  // slight overlap like Popka
-    const int hx0 = c_ox;
-    const int hx1 = c_ox + c_dw + c_gap;
-    BuildDigit(root_, clock_seg_[0], hx0, c_oy_h, c_dw, c_dh, c_th);
-    BuildDigit(root_, clock_seg_[1], hx1, c_oy_h, c_dw, c_dh, c_th);
-    BuildDigit(root_, clock_seg_[2], hx0, c_oy_m, c_dw, c_dh, c_th);
-    BuildDigit(root_, clock_seg_[3], hx1, c_oy_m, c_dw, c_dh, c_th);
-    for (int d = 0; d < 4; ++d)
-        for (int s = 0; s < 7; ++s) Track(clock_objs_, &clock_obj_n_, 40, clock_seg_[d][s]);
-
+    // ── Clock (Popka Stack): solid HH over MM, no colon, edge captions ───
+    // Builtin 30px font zoomed ~5.5× → ~165px glyphs (true black AMOLED poster).
     auto* lvgl_theme_clk = static_cast<LvglTheme*>(current_theme_);
     const lv_font_t* edge_font =
         (lvgl_theme_clk && lvgl_theme_clk->text_font()) ? lvgl_theme_clk->text_font()->font()
                                                        : nullptr;
+    const int32_t stack_zoom = (int32_t)(LV_SCALE_NONE * 5.5f);  // 30px → ~165px
+    auto make_stack = [&](lv_color_t color) -> lv_obj_t* {
+        lv_obj_t* lab = lv_label_create(root_);
+        lv_label_set_text(lab, "00");
+        lv_obj_set_style_text_color(lab, color, 0);
+        lv_obj_set_style_text_align(lab, LV_TEXT_ALIGN_CENTER, 0);
+        if (edge_font) lv_obj_set_style_text_font(lab, edge_font, 0);
+        lv_obj_set_style_transform_pivot_x(lab, lv_pct(50), 0);
+        lv_obj_set_style_transform_pivot_y(lab, lv_pct(50), 0);
+        lv_obj_set_style_transform_scale_x(lab, stack_zoom, 0);
+        lv_obj_set_style_transform_scale_y(lab, stack_zoom, 0);
+        return lab;
+    };
+    time_hh_label_ = make_stack(kWhite);
+    time_mm_label_ = make_stack(kCoral);
+    lv_obj_align(time_hh_label_, LV_ALIGN_CENTER, 0, -(int)(min_side * 0.17f));
+    lv_obj_align(time_mm_label_, LV_ALIGN_CENTER, 0, (int)(min_side * 0.17f));
+    Track(clock_objs_, &clock_obj_n_, 16, time_hh_label_);
+    Track(clock_objs_, &clock_obj_n_, 16, time_mm_label_);
+
     clock_edge_weather_ = lv_label_create(root_);
     lv_label_set_text(clock_edge_weather_, "");
     lv_obj_set_style_text_color(clock_edge_weather_, kCoral, 0);
     lv_obj_set_style_text_align(clock_edge_weather_, LV_TEXT_ALIGN_CENTER, 0);
     if (edge_font) lv_obj_set_style_text_font(clock_edge_weather_, edge_font, 0);
     lv_obj_align(clock_edge_weather_, LV_ALIGN_TOP_MID, 0, (int)(min_side * 0.04f));
-    Track(clock_objs_, &clock_obj_n_, 40, clock_edge_weather_);
+    Track(clock_objs_, &clock_obj_n_, 16, clock_edge_weather_);
 
     clock_edge_date_ = lv_label_create(root_);
     lv_label_set_text(clock_edge_date_, "");
@@ -257,7 +260,7 @@ void ValeraLcdDisplay::BuildFace() {
     lv_obj_set_style_text_align(clock_edge_date_, LV_TEXT_ALIGN_CENTER, 0);
     if (edge_font) lv_obj_set_style_text_font(clock_edge_date_, edge_font, 0);
     lv_obj_align(clock_edge_date_, LV_ALIGN_BOTTOM_MID, 0, -(int)(min_side * 0.05f));
-    Track(clock_objs_, &clock_obj_n_, 40, clock_edge_date_);
+    Track(clock_objs_, &clock_obj_n_, 16, clock_edge_date_);
 
     // ── Weather ──────────────────────────────────────────────────────────
     weather_glyph_ = MakePlain(root_);
@@ -799,11 +802,12 @@ void ValeraLcdDisplay::AnimateReplyFx() {
 void ValeraLcdDisplay::PaintClock(const struct tm* tm, bool colon_on) {
     (void)colon_on;
     if (tm == nullptr) return;
-    // Stacked face: HH white on top, MM coral below (Popka poster look).
-    LitDigit(clock_seg_[0], tm->tm_hour / 10, kWhite);
-    LitDigit(clock_seg_[1], tm->tm_hour % 10, kWhite);
-    LitDigit(clock_seg_[2], tm->tm_min / 10, kCoral);
-    LitDigit(clock_seg_[3], tm->tm_min % 10, kCoral);
+    char hh[4];
+    char mm[4];
+    snprintf(hh, sizeof(hh), "%02d", tm->tm_hour);
+    snprintf(mm, sizeof(mm), "%02d", tm->tm_min);
+    if (time_hh_label_) lv_label_set_text(time_hh_label_, hh);
+    if (time_mm_label_) lv_label_set_text(time_mm_label_, mm);
 
     ValeraClimate c = ValeraSensors::Get();
     char weather_line[48];

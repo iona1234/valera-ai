@@ -50,6 +50,13 @@ PWR читается с TCA9554 EXIO4 (`SYS_OUT`), BOOT — GPIO0.
 
 ## Циферблат 60 fps
 
+Визуал idle-часов вдохновлён [PopkaStudio](https://github.com/PopaSpinka/PopkaStudio)
+(stacked HH/MM на AMOLED, подписи у края). Код PopkaStudio **не копируем**
+(лицензия PolyForm Noncommercial) — только идея композиции.
+
+Планируется отдельный экран **интернет-радио** в духе Popka 2.1
+(Radio Browser, избранное, лучи-эквалайзер по ободу) — отдельным шагом.
+
 AMOLED CO5300 QSPI 466×466, штатные драйверы XiaoZhi/Waveshare:
 
 - LVGL `timer_period_ms = 16`, лицо тикает каждые 16 ms

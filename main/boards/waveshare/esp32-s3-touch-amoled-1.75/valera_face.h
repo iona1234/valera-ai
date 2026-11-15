@@ -69,9 +69,11 @@ private:
     lv_obj_t* root_ = nullptr;
     lv_obj_t* bezel_ = nullptr;
 
+    // Popka-inspired stacked HH / MM (no colon); edge captions for weather/date.
     lv_obj_t* clock_seg_[4][7] = {};
-    lv_obj_t* clock_colon_[2] = {};
-    lv_obj_t* clock_objs_[30] = {};
+    lv_obj_t* clock_edge_weather_ = nullptr;
+    lv_obj_t* clock_edge_date_ = nullptr;
+    lv_obj_t* clock_objs_[40] = {};
     int clock_obj_n_ = 0;
 
     lv_obj_t* weather_glyph_ = nullptr;
@@ -127,7 +129,8 @@ private:
     int idle_step_ = 0;
     int last_hour_ = -1;
     int last_min_ = -1;
-    bool last_colon_ = false;
+    int last_wday_ = -1;
+    int last_mday_ = -1;
     int last_out_temp_ = 9999;
     int last_room_temp_ = 9999;
     int last_weather_code_ = -999;

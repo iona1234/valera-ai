@@ -6,6 +6,7 @@
 #include "valera_sensors.h"
 
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -23,8 +24,33 @@ const lv_color_t kThink = lv_color_hex(0x8FA6FF);
 const lv_color_t kEye = lv_color_hex(0xF2F6FA);
 const lv_color_t kPupil = lv_color_hex(0x0A0C10);
 const lv_color_t kWhite = lv_color_hex(0xFFFFFF);
+const lv_color_t kCoral = lv_color_hex(0xFF8FA3);  // Popka-like minute / accent
+const lv_color_t kEdge = lv_color_hex(0x9AB4C8);   // curved-edge captions
 const lv_color_t kSun = lv_color_hex(0xFFD36A);
 const lv_color_t kCloud = lv_color_hex(0xC8D6E5);
+
+const char* WeatherWord(int code) {
+    if (code >= 80) return "SHOWERS";
+    if (code >= 61) return "RAIN";
+    if (code >= 51) return "DRIZZLE";
+    if (code >= 45) return "FOG";
+    if (code >= 3) return "CLOUDY";
+    if (code >= 1) return "FAIR";
+    return "CLEAR";
+}
+
+const char* Weekday3(int wday) {
+    static const char* kD[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+    if (wday < 0 || wday > 6) return "";
+    return kD[wday];
+}
+
+const char* Month3(int mon) {
+    static const char* kM[] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                               "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+    if (mon < 0 || mon > 11) return "";
+    return kM[mon];
+}
 
 constexpr uint8_t kSegBits[10] = {
     0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F,
@@ -194,32 +220,44 @@ void ValeraLcdDisplay::BuildFace() {
     lv_obj_set_style_border_color(bezel_, kCyanDim, 0);
     lv_obj_set_style_border_opa(bezel_, LV_OPA_30, 0);
 
-    // ── Clock ────────────────────────────────────────────────────────────
-    const int c_dw = (int)(min_side * 0.155f);
-    const int c_dh = (int)(min_side * 0.28f);
-    const int c_th = (int)(c_dw * 0.22f);
-    const int c_gap = (int)(c_dw * 0.16f);
-    const int c_cgap = (int)(c_dw * 0.34f);
-    const int c_total = c_dw * 4 + c_gap * 3 + c_cgap;
-    const int c_ox = (W - c_total) / 2;
-    const int c_oy = (H - c_dh) / 2;
-    int cxs[4];
-    cxs[0] = c_ox;
-    cxs[1] = c_ox + c_dw + c_gap;
-    cxs[2] = cxs[1] + c_dw + c_gap + c_cgap;
-    cxs[3] = cxs[2] + c_dw + c_gap;
-    for (int d = 0; d < 4; ++d) {
-        BuildDigit(root_, clock_seg_[d], cxs[d], c_oy, c_dw, c_dh, c_th);
-        for (int s = 0; s < 7; ++s) Track(clock_objs_, &clock_obj_n_, 30, clock_seg_[d][s]);
-    }
-    const int colon_x = cxs[1] + c_dw + (c_cgap - c_th) / 2;
-    clock_colon_[0] = MakeSeg(root_, colon_x, c_oy + c_dh / 3 - c_th / 2, c_th, c_th);
-    clock_colon_[1] = MakeSeg(root_, colon_x, c_oy + (2 * c_dh) / 3 - c_th / 2, c_th, c_th);
-    for (int i = 0; i < 2; ++i) {
-        lv_obj_set_style_bg_color(clock_colon_[i], kCyan, 0);
-        lv_obj_set_style_radius(clock_colon_[i], LV_RADIUS_CIRCLE, 0);
-        Track(clock_objs_, &clock_obj_n_, 30, clock_colon_[i]);
-    }
+    // ── Clock (Popka-inspired): stacked HH over MM, edge captions ────────
+    // Huge two-row digits fill the round face; hours white, minutes coral.
+    const int c_dw = (int)(min_side * 0.30f);
+    const int c_dh = (int)(min_side * 0.34f);
+    const int c_th = (int)(c_dw * 0.20f);
+    const int c_gap = (int)(c_dw * 0.10f);
+    const int c_row = c_dw * 2 + c_gap;
+    const int c_ox = (W - c_row) / 2;
+    const int c_oy_h = (int)(H * 0.14f);
+    const int c_oy_m = c_oy_h + (int)(c_dh * 0.82f);  // slight overlap like Popka
+    const int hx0 = c_ox;
+    const int hx1 = c_ox + c_dw + c_gap;
+    BuildDigit(root_, clock_seg_[0], hx0, c_oy_h, c_dw, c_dh, c_th);
+    BuildDigit(root_, clock_seg_[1], hx1, c_oy_h, c_dw, c_dh, c_th);
+    BuildDigit(root_, clock_seg_[2], hx0, c_oy_m, c_dw, c_dh, c_th);
+    BuildDigit(root_, clock_seg_[3], hx1, c_oy_m, c_dw, c_dh, c_th);
+    for (int d = 0; d < 4; ++d)
+        for (int s = 0; s < 7; ++s) Track(clock_objs_, &clock_obj_n_, 40, clock_seg_[d][s]);
+
+    auto* lvgl_theme_clk = static_cast<LvglTheme*>(current_theme_);
+    const lv_font_t* edge_font =
+        (lvgl_theme_clk && lvgl_theme_clk->text_font()) ? lvgl_theme_clk->text_font()->font()
+                                                       : nullptr;
+    clock_edge_weather_ = lv_label_create(root_);
+    lv_label_set_text(clock_edge_weather_, "");
+    lv_obj_set_style_text_color(clock_edge_weather_, kCoral, 0);
+    lv_obj_set_style_text_align(clock_edge_weather_, LV_TEXT_ALIGN_CENTER, 0);
+    if (edge_font) lv_obj_set_style_text_font(clock_edge_weather_, edge_font, 0);
+    lv_obj_align(clock_edge_weather_, LV_ALIGN_TOP_MID, 0, (int)(min_side * 0.04f));
+    Track(clock_objs_, &clock_obj_n_, 40, clock_edge_weather_);
+
+    clock_edge_date_ = lv_label_create(root_);
+    lv_label_set_text(clock_edge_date_, "");
+    lv_obj_set_style_text_color(clock_edge_date_, kEdge, 0);
+    lv_obj_set_style_text_align(clock_edge_date_, LV_TEXT_ALIGN_CENTER, 0);
+    if (edge_font) lv_obj_set_style_text_font(clock_edge_date_, edge_font, 0);
+    lv_obj_align(clock_edge_date_, LV_ALIGN_BOTTOM_MID, 0, -(int)(min_side * 0.05f));
+    Track(clock_objs_, &clock_obj_n_, 40, clock_edge_date_);
 
     // ── Weather ──────────────────────────────────────────────────────────
     weather_glyph_ = MakePlain(root_);
@@ -552,13 +590,14 @@ void ValeraLcdDisplay::Tick() {
         if (climate.clock_fix_ok) now += climate.clock_fix_sec;
         struct tm tm_info = {};
         localtime_r(&now, &tm_info);
-        const bool colon_on = ((tick_ / 30) % 2) == 0;
         if (tm_info.tm_hour != last_hour_ || tm_info.tm_min != last_min_ ||
-            colon_on != last_colon_) {
-            PaintClock(&tm_info, colon_on);
+            tm_info.tm_wday != last_wday_ || tm_info.tm_mday != last_mday_ ||
+            (tick_ % 120) == 0) {
+            PaintClock(&tm_info, false);
             last_hour_ = tm_info.tm_hour;
             last_min_ = tm_info.tm_min;
-            last_colon_ = colon_on;
+            last_wday_ = tm_info.tm_wday;
+            last_mday_ = tm_info.tm_mday;
         }
     } else if (idle_page_ == IdlePage::kWeather) {
         if ((tick_ % 60) == 0) PaintWeather();
@@ -758,12 +797,28 @@ void ValeraLcdDisplay::AnimateReplyFx() {
 }
 
 void ValeraLcdDisplay::PaintClock(const struct tm* tm, bool colon_on) {
+    (void)colon_on;
     if (tm == nullptr) return;
-    int digits[4] = {tm->tm_hour / 10, tm->tm_hour % 10, tm->tm_min / 10, tm->tm_min % 10};
-    for (int d = 0; d < 4; ++d) LitDigit(clock_seg_[d], digits[d], kCyan);
-    const lv_opa_t opa = colon_on ? LV_OPA_COVER : LV_OPA_30;
-    lv_obj_set_style_bg_opa(clock_colon_[0], opa, 0);
-    lv_obj_set_style_bg_opa(clock_colon_[1], opa, 0);
+    // Stacked face: HH white on top, MM coral below (Popka poster look).
+    LitDigit(clock_seg_[0], tm->tm_hour / 10, kWhite);
+    LitDigit(clock_seg_[1], tm->tm_hour % 10, kWhite);
+    LitDigit(clock_seg_[2], tm->tm_min / 10, kCoral);
+    LitDigit(clock_seg_[3], tm->tm_min % 10, kCoral);
+
+    ValeraClimate c = ValeraSensors::Get();
+    char weather_line[48];
+    if (c.outdoor_ok) {
+        snprintf(weather_line, sizeof(weather_line), "%d° %s", (int)lroundf(c.outdoor_c),
+                 WeatherWord(c.weather_code));
+    } else {
+        snprintf(weather_line, sizeof(weather_line), "%s", WeatherWord(c.weather_code));
+    }
+    if (clock_edge_weather_) lv_label_set_text(clock_edge_weather_, weather_line);
+
+    char date_line[48];
+    snprintf(date_line, sizeof(date_line), "%s %d %s", Weekday3(tm->tm_wday), tm->tm_mday,
+             Month3(tm->tm_mon));
+    if (clock_edge_date_) lv_label_set_text(clock_edge_date_, date_line);
 }
 
 void ValeraLcdDisplay::PaintWeather() {

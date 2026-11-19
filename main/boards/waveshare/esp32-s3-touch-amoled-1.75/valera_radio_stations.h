@@ -4,7 +4,9 @@
 
 // Russian-only internet-radio presets for Valera (AMOLED 1.75).
 // Each URL returned HTTP 200 + audio/* when probed on 2026-11-15.
-// No foreign/Popka Paradise stations. Playback pipeline is separate.
+// No foreign/Popka Paradise stations.
+// Poster UI (Popka-style): ICY StreamTitle → song marquee; station list shows
+// now-playing under the live station. Decode/ICY net path still to wire.
 
 struct ValeraRadioStation {
     const char* name;

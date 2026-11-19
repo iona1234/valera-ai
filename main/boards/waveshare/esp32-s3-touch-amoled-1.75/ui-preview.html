@@ -98,30 +98,31 @@
 </div>
 <script>
 const STATIONS = [
-  {name:"Наше Радио", genre:"rock", color:"#E2483D", kbps:128},
-  {name:"Европа Плюс", genre:"hits", color:"#3E7BDB", kbps:128},
-  {name:"Европа Плюс Москва", genre:"hits", color:"#5FA8A0", kbps:128},
-  {name:"Русское Радио", genre:"hits", color:"#C0392B", kbps:128},
-  {name:"Maximum", genre:"rock", color:"#F2994A", kbps:96},
-  {name:"DFM", genre:"dance", color:"#9B5CFF", kbps:96},
-  {name:"Hit FM", genre:"hits", color:"#FF6A13", kbps:96},
-  {name:"Radio Record", genre:"dance", color:"#E6007E", kbps:96},
-  {name:"Record VIP House", genre:"dance", color:"#C9A0FF", kbps:96},
-  {name:"Record Techno", genre:"dance", color:"#0E8C8A", kbps:96},
-  {name:"Record Mix", genre:"dance", color:"#7CC47F", kbps:96},
-  {name:"Record Russian Hits", genre:"hits", color:"#FF8A65", kbps:96},
-  {name:"Record Trap", genre:"dance", color:"#8FB6FF", kbps:96},
-  {name:"Record House Hits", genre:"dance", color:"#F5C400", kbps:96},
-  {name:"Record Synthwave", genre:"dance", color:"#5B8DEF", kbps:96},
-  {name:"Record Club", genre:"dance", color:"#FF6B6B", kbps:96},
-  {name:"Монте-Карло", genre:"lounge", color:"#D4AF37", kbps:96},
-  {name:"Ретро FM", genre:"hits", color:"#C45C26", kbps:256},
-  {name:"Дорожное радио", genre:"hits", color:"#2E86AB", kbps:128},
-  {name:"Шансон", genre:"chanson", color:"#8B4513", kbps:128},
-  {name:"Серебряный Дождь", genre:"talk", color:"#A0AEC0", kbps:128},
-  {name:"Вести FM", genre:"news", color:"#2E6FE0", kbps:192},
-  {name:"Маяк", genre:"news", color:"#F5C400", kbps:192},
+  {name:"Наше Радио", genre:"rock", color:"#E2483D", kbps:128, song:"Сети — Смайл"},
+  {name:"Европа Плюс", genre:"hits", color:"#3E7BDB", kbps:128, song:"Европа Плюс — Non-Stop Hits"},
+  {name:"Европа Плюс Москва", genre:"hits", color:"#5FA8A0", kbps:128, song:"Москва — Top 40"},
+  {name:"Русское Радио", genre:"hits", color:"#C0392B", kbps:128, song:"Русские хиты — эфир"},
+  {name:"Maximum", genre:"rock", color:"#F2994A", kbps:96, song:"Maximum — Rock Chart"},
+  {name:"DFM", genre:"dance", color:"#9B5CFF", kbps:96, song:"DFM — Dance Floor"},
+  {name:"Hit FM", genre:"hits", color:"#FF6A13", kbps:96, song:"Hit FM — Fresh Hits"},
+  {name:"Radio Record", genre:"dance", color:"#E6007E", kbps:96, song:"Record Club — Gvozd"},
+  {name:"Record VIP House", genre:"dance", color:"#C9A0FF", kbps:96, song:"VIP House — Deep Set"},
+  {name:"Record Techno", genre:"dance", color:"#0E8C8A", kbps:96, song:"Techno — Peak Time"},
+  {name:"Record Mix", genre:"dance", color:"#7CC47F", kbps:96, song:"Record Mix — Live"},
+  {name:"Record Russian Hits", genre:"hits", color:"#FF8A65", kbps:96, song:"Russian Hits — Now"},
+  {name:"Record Trap", genre:"dance", color:"#8FB6FF", kbps:96, song:"Trap — Night Drive"},
+  {name:"Record House Hits", genre:"dance", color:"#F5C400", kbps:96, song:"House Hits — Weekend"},
+  {name:"Record Synthwave", genre:"dance", color:"#5B8DEF", kbps:96, song:"Synthwave — Neon"},
+  {name:"Record Club", genre:"dance", color:"#FF6B6B", kbps:96, song:"Club — Afterhours"},
+  {name:"Монте-Карло", genre:"lounge", color:"#D4AF37", kbps:96, song:"Monte Carlo — Soft"},
+  {name:"Ретро FM", genre:"hits", color:"#C45C26", kbps:256, song:"Ретро — Золотые 80-е"},
+  {name:"Дорожное радио", genre:"hits", color:"#2E86AB", kbps:128, song:"В дорогу — эфир"},
+  {name:"Шансон", genre:"chanson", color:"#8B4513", kbps:128, song:"Шансон — для души"},
+  {name:"Серебряный Дождь", genre:"talk", color:"#A0AEC0", kbps:128, song:"Разговорный эфир"},
+  {name:"Вести FM", genre:"news", color:"#2E6FE0", kbps:192, song:"Вести — выпуск"},
+  {name:"Маяк", genre:"news", color:"#F5C400", kbps:192, song:"Маяк — новости"},
 ];
+const PLAYING_IDX = 0; // currently playing station (preview)
 const FOLDERS = [
   {t:"Избранное", s: STATIONS.length+" станций", c:"#FF8BCB"},
   {t:"Хиты", s:"Европа · Hit FM · Maximum", c:"#FF8A3D"},
@@ -136,8 +137,8 @@ const META = {
   listen:{t:"Слушает", d:"Глаза + симметричный cyan рот-EQ (11 столбиков, L↔R mirror), без текста."},
   think:{t:"Думает", d:"Та же морда, спокойнее violet анимация."},
   speak:{t:"Ответ", d:"Голосовой помощник: крупный текст + коралловый живой EQ (не cyan listen)."},
-  radio:{t:"Радио · Poster", d:"Российские станции, лучи-EQ, STATIONS / VOLUME, Play у края."},
-  stations:{t:"Станции · скролл Popka", d:"Карточки 410×104, сжатие/затухание у края круга, инерция. Тяни пальцем."},
+  radio:{t:"Радио · Poster · Popka", d:"Симметричные лучи L↔R (23×2), ICY-название трека, edge Play/Stop."},
+  stations:{t:"Станции · now playing", d:"Карточки 410×104 + название текущей песни у играющей станции. Скролл Popka."},
   volume:{t:"Громкость", d:"+/− вокруг динамика, дуга уровня."},
   wifi:{t:"Wi‑Fi настройка", d:"Hotspot Xiaozhi-XXXX → браузер с формой сети. Первый boot без SSID входит сам."},
   gallery:{t:"Галерея приложений", d:"Карточки приложений со скроллом как у Popka."},
@@ -246,32 +247,85 @@ function drawSpeak(c,t){
   }
   unclip(c);
 }
+// Popka radio rays: 23 bands/side, low at +32°, high at −64°, left mirrors right (same levels).
+const RP_A_TOP=-64, RP_A_BOT=32, RP_R0=224, RP_LMAX=58, RD_BANDS=23;
+function rpAng(side,i){
+  const a=(RP_A_BOT+(RP_A_TOP-RP_A_BOT)*i/(RD_BANDS-1))*Math.PI/180;
+  return side ? Math.PI-a : a;
+}
+function rpBandLevel(i,t){
+  // shared L↔R envelope (Popka Goertzel stand-in): low bands calmer, mid peak
+  const shape=.22+.78*Math.sin((i+.5)/RD_BANDS*Math.PI);
+  const wave=.35+.65*Math.abs(Math.sin(t*.008+i*.38));
+  const kick=.15*Math.abs(Math.sin(t*.021+i*.11));
+  return Math.min(1, Math.max(.08, shape*wave+kick));
+}
+function rpRayColor(level){
+  if(level<.18) return '#3A3A40';
+  if(level<.45) return '#FFB98A';
+  if(level<.78) return '#FF8A3D';
+  return '#FFF1E4';
+}
+function drawRadioRays(c,t,playing){
+  for(let i=0;i<RD_BANDS;i++){
+    const level=playing?rpBandLevel(i,t):.08;
+    const len=level*RP_LMAX*1.15;
+    const col=rpRayColor(level);
+    const hw=2.6+1.4*level; // capsule half-width
+    for(let side=0;side<2;side++){
+      const ang=rpAng(side,i);
+      const x0=CX+Math.cos(ang)*RP_R0, y0=CY+Math.sin(ang)*RP_R0;
+      const x1=CX+Math.cos(ang)*(RP_R0-len), y1=CY+Math.sin(ang)*(RP_R0-len);
+      c.strokeStyle=col; c.lineWidth=hw*2; c.lineCap='round';
+      c.beginPath(); c.moveTo(x0,y0); c.lineTo(x1,y1); c.stroke();
+    }
+  }
+}
+function drawEdgePlay(c,label,playing){
+  // Popka HI_EDGE: bottom follows circle r≈227, height≈92
+  const R=227, h=92, y1=CY+Math.sqrt(Math.max(0,R*R-180*180))-4;
+  const y0=y1-h+28;
+  c.save();
+  c.beginPath(); c.arc(CX,CY,233,0,Math.PI*2); c.clip();
+  c.fillStyle='#FF8A3D';
+  rr(c,CX-150,y0,300,h,46); c.fill();
+  c.fillStyle='#2A1200'; c.font='800 26px Outfit,sans-serif';
+  c.textAlign='center'; c.textBaseline='middle';
+  c.fillText((playing?'■  ':'▶  ')+label, CX, y0+h*0.42);
+  c.restore();
+}
 function drawRadio(c,t){
   clear(c);
-  const st=STATIONS[0];
-  for(let side=0;side<2;side++)for(let i=0;i<23;i++){
-    const u=i/22, angDeg=side?(180+32-u*(96)):(-64+u*96), ang=angDeg*Math.PI/180;
-    const level=.15+.85*Math.abs(Math.sin(t*.01+i*.35+side));
-    const len=10+level*48,r0=224,r1=r0-len;
-    c.strokeStyle=`rgba(255,${Math.floor(185+70*level)},${Math.floor(140+80*level)},${.35+.65*level})`;
-    c.lineWidth=3;c.lineCap='round';
-    c.beginPath();c.moveTo(CX+Math.cos(ang)*r0,CY+Math.sin(ang)*r0);c.lineTo(CX+Math.cos(ang)*r1,CY+Math.sin(ang)*r1);c.stroke();
-  }
+  const st=STATIONS[PLAYING_IDX];
+  const playing=true;
+  drawRadioRays(c,t,playing);
   const now=new Date();
   c.textAlign='center';c.textBaseline='middle';c.fillStyle='#FFF8EE';
-  c.font='700 22px Outfit,sans-serif';c.fillText(`${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`,CX,34);
-  c.font='800 34px Outfit,sans-serif';c.fillText(st.name,CX,140);
-  c.font='500 16px Outfit,sans-serif';c.fillStyle='#9E9E9E';c.fillText(st.genre+' · RU',CX,172);
-  c.fillStyle='#FFF8EE';c.font='500 15px Outfit,sans-serif';
-  c.save();c.beginPath();rr(c,CX-140,228,280,22,8);c.clip();
-  const song='  ·  живой эфир · проверенный поток  ·  ';
-  c.fillText(song+song,CX+140-((t/30)%600),240);c.restore();
-  c.fillStyle='#FF8A3D';c.font='700 12px Outfit,sans-serif';
-  c.fillText('☰',CX-65,288);c.fillText('СТАНЦИИ',CX-65,312);
-  c.fillText('🔊',CX+65,288);c.fillText('ГРОМКОСТЬ',CX+65,312);
-  c.strokeStyle='#FFF8EE';c.lineWidth=1;c.globalAlpha=.5;c.beginPath();c.moveTo(CX,278);c.lineTo(CX,318);c.stroke();c.globalAlpha=1;
-  c.fillStyle='#FF8A3D';rr(c,CX-120,360,240,72,36);c.fill();
-  c.fillStyle='#2A1200';c.font='800 24px Outfit,sans-serif';c.fillText('■  Стоп',CX,398);
+  c.font='700 22px Outfit,sans-serif';
+  c.fillText(`${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`,CX,30);
+  // Station name only (Popka: genre/tag lives in song line as ICY fallback)
+  c.font='800 36px Outfit,sans-serif'; c.fillText(st.name,CX,146);
+  // Now-playing marquee (ICY StreamTitle)
+  const song=(st.song&&st.song.length)?st.song:(st.genre+' · RU');
+  c.fillStyle='#9E9E9E'; c.font='500 16px Outfit,sans-serif';
+  c.save(); c.beginPath(); rr(c,CX-140,228,280,24,8); c.clip();
+  const gap=96, tw=c.measureText(song).width;
+  const period=Math.max(tw+gap, 280), hold=4000, speed=64/1000; // px/ms after hold
+  const phase=t% (hold + period/speed);
+  let ox=0;
+  if(phase>hold) ox=(phase-hold)*speed;
+  const base=CX-140+12 - ox;
+  c.textAlign='left'; c.textBaseline='middle';
+  c.fillText(song, base, 240);
+  c.fillText(song, base+period, 240);
+  c.restore();
+  // STATIONS | VOLUME — symmetric
+  c.fillStyle='#FF8A3D'; c.font='700 13px Outfit,sans-serif'; c.textAlign='center';
+  c.fillText('☰',CX-65,291); c.fillText('СТАНЦИИ',CX-65,316);
+  c.fillText('🔊',CX+65,291); c.fillText('ГРОМКОСТЬ',CX+65,316);
+  c.strokeStyle='#FFF8EE'; c.lineWidth=1; c.globalAlpha=.45;
+  c.beginPath(); c.moveTo(CX,278); c.lineTo(CX,328); c.stroke(); c.globalAlpha=1;
+  drawEdgePlay(c,'Стоп',true);
   unclip(c);
 }
 function drawShade(c){
@@ -294,19 +348,27 @@ function drawVolume(c){
   unclip(c);
 }
 
-// Popka gallery scroll: cards 410×104, shrink/fade at circle edges
+// Popka Halo list: cards 410×104, scale→0.6, alpha≈a² at circle edge
 const CARD_H=104, CARD_W=410, CARD_GAP=8, HEAD_H=64;
 function listMetrics(){
-  const items = stationMode==='folders' ? FOLDERS : STATIONS.map(s=>({t:s.name,s:s.genre+' · '+s.kbps+' kbps',c:s.color}));
-  const contentH = HEAD_H + items.length*(CARD_H+CARD_GAP) + 40;
+  const items = stationMode==='folders'
+    ? FOLDERS.map(f=>({t:f.t,s:f.s,c:f.c,live:false,song:''}))
+    : STATIONS.map((s,i)=>({
+        t:s.name,
+        s: i===PLAYING_IDX ? ('♪ '+s.song) : (s.genre+' · '+s.kbps+' kbps'),
+        c:s.color, live:i===PLAYING_IDX, song:s.song||''
+      }));
+  const contentH = HEAD_H + items.length*(CARD_H+CARD_GAP) + 100;
   const maxScroll = Math.max(0, contentH - 420);
   return {items, contentH, maxScroll};
+}
+function easeS(x){ // (0.3,0,0.7,1)-ish
+  return x*x*(3-2*x);
 }
 function drawStations(c){
   clear(c);
   const {items, maxScroll} = listMetrics();
   scrollY = clamp(scrollY, 0, maxScroll);
-  // title scrolls away
   const titleK = clamp(1 - scrollY/80, 0, 1);
   c.globalAlpha = titleK;
   c.textAlign='center';c.textBaseline='middle';c.fillStyle='#FFF8EE';c.font='700 20px Outfit,sans-serif';
@@ -316,31 +378,40 @@ function drawStations(c){
   let y = 70 - scrollY;
   items.forEach((it,i)=>{
     const mid = y + CARD_H/2;
-    // distance from center → scale/alpha like Popka/HaloWatch
-    const dist = Math.abs(mid - CY) / 200;
-    const scale = clamp(1 - dist*0.22, 0.72, 1);
-    const alpha = clamp(1 - dist*0.55, 0.25, 1);
+    const dist = Math.min(1, Math.abs(mid - CY) / 210);
+    const e = easeS(dist);
+    const aBg = clamp(0.5 + 0.5*(1-e), 0.25, 1); // Popka a_bg
+    const scale = clamp(1 - e*0.4, 0.6, 1);      // → 0.6 at edge
+    const alpha = aBg*aBg;                         // a_c = a_bg²
     const w = CARD_W * scale, h = CARD_H * scale;
     const x = CX - w/2;
     const yy = mid - h/2;
-    // only draw if intersects circle roughly
     if (yy < 450 && yy+h > 20) {
       c.save(); c.globalAlpha = alpha;
       rr(c,x,yy,w,h,22*scale); c.fillStyle='#2E3034'; c.fill();
+      // color disc + mini EQ when live
       c.beginPath(); c.arc(x+40*scale, mid, 22*scale, 0, Math.PI*2); c.fillStyle=it.c; c.fill();
-      c.textAlign='left'; c.fillStyle='#FFF8EE'; c.font=`700 ${Math.round(20*scale)}px Outfit,sans-serif`;
-      c.fillText(it.t, x+74*scale, mid-10*scale);
-      c.fillStyle='#9E9E9E'; c.font=`500 ${Math.round(13*scale)}px Outfit,sans-serif`;
-      c.fillText(it.s, x+74*scale, mid+14*scale);
+      if(it.live){
+        c.fillStyle='#FFF8EE';
+        for(let b=0;b<3;b++){
+          const bh=6+10*Math.abs(Math.sin(performance.now()*.006+b));
+          rr(c,x+40*scale-10+b*7, mid-bh/2, 4, bh, 2); c.fill();
+        }
+      }
+      c.textAlign='left'; c.fillStyle='#FFF8EE';
+      c.font=`700 ${Math.round(20*scale)}px Outfit,sans-serif`;
+      c.fillText(it.t, x+74*scale, mid-(it.live?14:10)*scale);
+      c.fillStyle=it.live?'#FFB98A':'#9E9E9E';
+      c.font=`500 ${Math.round(13*scale)}px Outfit,sans-serif`;
+      const sub=it.s.length>34?it.s.slice(0,33)+'…':it.s;
+      c.fillText(sub, x+74*scale, mid+(it.live?12:14)*scale);
       c.restore();
     }
     y += CARD_H + CARD_GAP;
   });
 
-  // edge button "Играет"
-  c.fillStyle='#FF8A3D'; rr(c,CX-120,390,240,56,28); c.fill();
-  c.fillStyle='#2A1200'; c.font='800 18px Outfit,sans-serif'; c.textAlign='center'; c.textBaseline='middle';
-  c.fillText('▶  Наше Радио', CX, 418);
+  // edge now-playing (station name)
+  drawEdgePlay(c, STATIONS[PLAYING_IDX].name, true);
   unclip(c);
 }
 function drawGallery(c){

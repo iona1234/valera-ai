@@ -13,6 +13,7 @@
 #include "axp2101.h"
 #include "i2c_device.h"
 #include "valera_face.h"
+#include "valera_radio_prefs.h"
 #include "valera_radio_stations.h"
 #include "valera_sensors.h"
 
@@ -426,9 +427,9 @@ private:
             [](const PropertyList& properties) -> ReturnValue { return ValeraSensors::Describe(); });
         mcp_server.AddTool(
             "self.valera.clock_style",
-            "Стиль часов Valera (Popka Stack). look: 0=Stack, 1=Neon, 2=Soft; "
+            "Тема/стиль часов Valera. look: 0=Modern, 1=Neon, 2=Soft, 3=Retro, 4=Digital; "
             "scale_pct 80..160; hh_color/mm_color как 0xRRGGBB.",
-            PropertyList({Property("look", kPropertyTypeInteger, 0, 0, 2),
+            PropertyList({Property("look", kPropertyTypeInteger, 0, 0, 4),
                           Property("scale_pct", kPropertyTypeInteger, 100, 80, 160),
                           Property("hh_color", kPropertyTypeInteger, 0xFFFFFF),
                           Property("mm_color", kPropertyTypeInteger, 0xFF8FA3)}),
@@ -442,23 +443,36 @@ private:
             });
         mcp_server.AddTool(
             "self.valera.radio_stations",
-            "Список проверенных российских интернет-радиостанций Valera (имя, жанр, URL, kbps).",
+            "Видимые российские интернет-радиостанции Valera (скрытые через radio_hide не показаны).",
             PropertyList(),
             [](const PropertyList& properties) -> ReturnValue {
-                std::string out;
-                out.reserve(kValeraRadioStationCount * 96);
-                for (int i = 0; i < kValeraRadioStationCount; ++i) {
-                    const auto& s = kValeraRadioStations[i];
-                    if (i) out += "\n";
-                    out += s.name;
-                    out += " · ";
-                    out += s.genre;
-                    out += " · ";
-                    out += std::to_string(s.kbps);
-                    out += "kbps · ";
-                    out += s.url;
-                }
-                return out;
+                ValeraRadioPrefs::Load();
+                return ValeraRadioPrefs::ListVisible();
+            });
+        mcp_server.AddTool(
+            "self.valera.radio_hide",
+            "Скрыть станцию из списка (нерабочая/нежелательная). index — номер из radio_stations.",
+            PropertyList({Property("index", kPropertyTypeInteger, 0, 0, kValeraRadioStationCount - 1)}),
+            [](const PropertyList& properties) -> ReturnValue {
+                ValeraRadioPrefs::SetHidden(properties["index"].value<int>(), true);
+                return ValeraRadioPrefs::ListHidden();
+            });
+        mcp_server.AddTool(
+            "self.valera.radio_restore",
+            "Вернуть скрытую станцию. index — номер станции; без параметров — восстановить все.",
+            PropertyList({Property("index", kPropertyTypeInteger, -1, -1, kValeraRadioStationCount - 1)}),
+            [](const PropertyList& properties) -> ReturnValue {
+                const int idx = properties["index"].value<int>();
+                if (idx < 0) ValeraRadioPrefs::ClearHidden();
+                else ValeraRadioPrefs::SetHidden(idx, false);
+                return ValeraRadioPrefs::ListVisible();
+            });
+        mcp_server.AddTool(
+            "self.valera.radio_hidden",
+            "Список скрытых радиостанций Valera.",
+            PropertyList(),
+            [](const PropertyList& properties) -> ReturnValue {
+                return ValeraRadioPrefs::ListHidden();
             });
 #endif
     }
@@ -477,6 +491,7 @@ public:
         InitializeButtons();
         InitializeTools();
 #if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+        ValeraRadioPrefs::Load();
         ValeraSensors::Start();
 #endif
         InitializeColdBootHygiene();

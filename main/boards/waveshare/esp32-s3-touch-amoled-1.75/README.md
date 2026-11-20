@@ -67,15 +67,19 @@ PWR читается с TCA9554 EXIO4 (`SYS_OUT`), BOOT — GPIO0.
 Визуал и структура окон — как у [PopkaStudio](https://github.com/PopaSpinka/PopkaStudio)
 (автор разрешил использовать код; проект некоммерческий).
 
-**Idle:** Stack-часы (HH / MM) ↔ крупная погода ↔ playful-глаза.
+**Idle:** Modern-часы ↔ погода ↔ playful-глаза (Sber) ↔ процедурное слайд-шоу.
+Свайп ←/→ листает страницы; свайп ↓ с верха открывает **шторку** настроек
+(яркость, громкость, тема, сброс Wi‑Fi).
 
-**Стиль часов** (NVS `valera` + MCP `self.valera.clock_style`):
+**Темы / стиль часов** (NVS `valera` + MCP `self.valera.clock_style`):
 
 | look | вид |
 | --- | --- |
-| 0 Stack | белые HH / coral MM, свой `hh_color`/`mm_color` |
+| 0 Modern | белые HH / coral MM (или свои `hh_color`/`mm_color`) |
 | 1 Neon | cyan / magenta |
 | 2 Soft | светло-розовые / coral |
+| 3 Retro | янтарный / терракота |
+| 4 Digital | mint / teal |
 | `scale_pct` | 80…160 (масштаб через LVGL zoom) |
 
 **Слушает ≠ отвечает:**
@@ -96,11 +100,14 @@ PWR читается с TCA9554 EXIO4 (`SYS_OUT`), BOOT — GPIO0.
 Предпросмотр: [`ui-preview.html`](./ui-preview.html), скрины `ui-screens/`.
 
 ```
-Циферблат ──► Погода / Глаза(Sber) / Shade↓ / Радио / Галерея
+Циферблат ──► Погода / Глаза(Sber) / Слайды / Shade↓ / Радио / Галерея
 Wake «Валера» ──► Слушает(cyan EQ) ──► Думает ──► Ответ(coral EQ) ──► idle
-Радио ──► Станции (папки, скролл Popka) / Громкость
+Радио ──► Станции (папки, скролл Popka, скрытие) / Громкость
 Wi‑Fi ──► hotspot Xiaozhi-XXXX → браузер
 ```
+
+Карта жестов: `ui-preview.html` → «Карта жестов», скрин `ui-screens/14-map.webp`.
+Сводное ТЗ: [`TZ.md`](./TZ.md).
 
 ### Российское радио (Popka poster)
 
@@ -109,9 +116,10 @@ Wi‑Fi ──► hotspot Xiaozhi-XXXX → браузер
 - **Лучи:** 23×2 симметричных capsule-луча (низ +32° → верх −64°, L = зеркало R)
 - **Трек:** ICY-стиль marquee на постере; в списке у играющей станции — `♪ название`
 - **Edge Play/Stop** по дуге круга, как у автора
+- **Скрытие:** NVS `radio_hide` + MCP `radio_hide` / `radio_restore` / `radio_hidden`
 
 Пресеты (HTTP 200 + `audio/*`): `valera_radio_stations.h` — 23 РФ-станции.
-MCP: `self.valera.radio_stations`. Декод потока + живой ICY в LVGL — следующий этап.
+MCP: `self.valera.radio_stations` (только видимые). Декод потока + живой ICY в LVGL — на железе.
 
 ### Память Flash (16 МБ)
 

@@ -29,7 +29,8 @@ public:
     void SetPowerSaveMode(bool on) override;
     void SetTheme(Theme* theme) override;
 
-    // Clock look: 0=Stack, 1=Neon, 2=Soft. Scale percent 80..160.
+    // Clock look: 0=Modern/Stack, 1=Neon, 2=Soft, 3=Retro, 4=Digital.
+    // Scale percent 80..160.
     void SetClockStyle(int look, int scale_pct, uint32_t hh_color, uint32_t mm_color);
     void LoadClockStyle();
 
@@ -37,7 +38,7 @@ public:
 
 private:
     enum class ActiveMode { kIdle, kListen, kSpeak, kThink, kWifi, kSleep };
-    enum class IdlePage { kClock, kWeather, kPlay };
+    enum class IdlePage { kClock, kWeather, kPlay, kSlides };
 
     static constexpr int kSpectrumN = 11;  // odd → perfect center bar, L↔R mirror
 
@@ -69,8 +70,16 @@ private:
     void PaintClock(const struct tm* tm, bool colon_on);
     void PaintWeather();
     void PaintWifiHint();
+    void PaintSlides();
     void ApplyClockStyleVisual();
     void SetGroupHidden(lv_obj_t* const* objs, int n, bool hidden);
+
+    void BuildShade();
+    void ShowShade(bool open);
+    void RefreshShade();
+    void CycleTheme();
+    static void GestureEventCb(lv_event_t* e);
+    void OnGesture(lv_event_t* e);
 
     void AnimateAmbient();
     void AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, int16_t pupil_r, bool playful);
@@ -104,6 +113,15 @@ private:
     lv_obj_t* weather_cond_label_ = nullptr;
     lv_obj_t* weather_objs_[16] = {};
     int weather_obj_n_ = 0;
+
+    // Procedural slideshow (0 flash image bytes).
+    lv_obj_t* slide_wash_ = nullptr;
+    lv_obj_t* slide_orb_[4] = {};
+    lv_obj_t* slide_label_ = nullptr;
+    lv_obj_t* slide_objs_[12] = {};
+    int slide_obj_n_ = 0;
+    int slide_index_ = 0;
+    int slide_ticks_ = 0;
 
     Eye play_left_{};
     Eye play_right_{};
@@ -143,6 +161,18 @@ private:
     lv_obj_t* wifi_objs_[12] = {};
     int wifi_obj_n_ = 0;
 
+    // Phone-like shade (swipe down from top).
+    lv_obj_t* shade_panel_ = nullptr;
+    lv_obj_t* shade_handle_ = nullptr;
+    lv_obj_t* shade_title_ = nullptr;
+    lv_obj_t* shade_rows_[6] = {};
+    lv_obj_t* shade_objs_[16] = {};
+    int shade_obj_n_ = 0;
+    bool shade_open_ = false;
+    bool gesture_tracking_ = false;
+    int16_t gesture_start_x_ = 0;
+    int16_t gesture_start_y_ = 0;
+
     lv_timer_t* timer_ = nullptr;
 
     bool face_ready_ = false;
@@ -179,5 +209,6 @@ private:
 
     static constexpr int kClockTicks = 14 * 60;
     static constexpr int kWeatherTicks = 10 * 60;
-    static constexpr int kPlayTicks = 12 * 60;
+    static constexpr int kPlayTicks = 10 * 60;
+    static constexpr int kSlidesTicks = 12 * 60;
 };

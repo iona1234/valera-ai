@@ -6,7 +6,7 @@ MCLK GPIO42, BME280 на GPIO16/17. Вариант 1.75c из `config.json` уб
 ## Первый запуск
 
 Пошагово: Wi‑Fi, регистрация на **xiaozhi.me**, привязка, жесты, wake —  
-см. **[SETUP.md](./SETUP.md)**. Идеи развития: **[IDEAS.md](./IDEAS.md)**. ТЗ: **[TZ.md](./TZ.md)**.
+см. **[OVERVIEW.md](./OVERVIEW.md)** (структура/кнопки), **[SETUP.md](./SETUP.md)**. Идеи развития: **[IDEAS.md](./IDEAS.md)**. ТЗ: **[TZ.md](./TZ.md)**.
 
 ## Прошивка
 

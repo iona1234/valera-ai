@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Valera · ТЗ · AMOLED 1.75</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@500;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#06070b; --panel:#10131a; --line:#1e2430; --text:#e8edf4; --muted:#8b95a8;
+  --coral:#FF8FA3; --orange:#FF8A3D; --cyan:#5EEAD4; --card:#2E3034; --ink:#2A1200;
+  --r-btn:36px; --r-card:28px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Outfit,sans-serif;background:var(--bg);color:var(--text)}
+header{padding:20px 24px 6px;max-width:1480px;margin:0 auto}
+header h1{margin:0 0 6px;font-size:24px;font-weight:700}
+header p{margin:0;color:var(--muted);font-size:14px;line-height:1.5;max-width:90ch}
+.layout{display:grid;grid-template-columns:270px 1fr;gap:14px;max-width:1480px;margin:0 auto;padding:10px 24px 40px}
+@media(max-width:980px){.layout{grid-template-columns:1fr}}
+.tree,.stage{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:14px}
+.tree h2,.stage h2{margin:0 0 10px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border:1px solid transparent;color:var(--text);border-radius:12px;padding:9px 10px;margin:2px 0;cursor:pointer;font:inherit;font-size:13.5px;font-weight:500}
+.item:hover{background:#161b26}.item.active{background:#1a2230;border-color:#314057}
+.dot{width:8px;height:8px;border-radius:50%;background:#3a4558;flex:0 0 auto}.item.active .dot{background:var(--coral)}
+.tag{margin-left:auto;font-size:10px;color:var(--muted)}.tag.ru{color:var(--orange)}
+.note{margin-top:10px;padding:10px;border-radius:14px;background:#0c1018;border:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.45}
+.title{font-size:19px;font-weight:700;margin-bottom:3px}
+.desc{color:var(--muted);font-size:13px;margin-bottom:12px;line-height:1.45}
+.watch-wrap{display:flex;justify-content:center;padding:6px 0 12px}
+.watch{width:min(100%,300px);aspect-ratio:1;border-radius:50%;background:#000;overflow:hidden;position:relative;box-shadow:0 0 0 10px #12151c,0 0 0 11px #2a303c,0 22px 44px rgba(0,0,0,.55);touch-action:none}
+.watch canvas{width:100%;height:100%;display:block}
+.themes{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}
+.themes button{border:1px solid var(--line);background:#0c1018;color:var(--text);border-radius:999px;padding:7px 12px;font:600 12px Outfit,sans-serif;cursor:pointer}
+.themes button.on{border-color:var(--orange);color:var(--orange)}
+.hint{font-size:12px;color:var(--muted);text-align:center}
+.mapbox{display:none;margin-top:8px;padding:12px;border-radius:14px;background:#0c1018;border:1px solid var(--line)}
+.mapbox.on{display:block}
+.mapbox svg{width:100%;height:auto;max-height:420px}
+.grid{display:none;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:8px}
+.grid.on{display:grid}
+.grid .cell{display:flex;flex-direction:column;align-items:center;gap:6px}
+.grid .mini{width:100%;aspect-ratio:1;border-radius:50%;background:#000;overflow:hidden;box-shadow:0 0 0 5px #12151c}
+.grid canvas{width:100%;height:100%;display:block}
+.grid .lab{font-size:11px;color:var(--muted);text-align:center}
+.mem{margin-top:10px;padding:12px;border-radius:14px;background:#0c1018;border:1px solid var(--line);font-size:12.5px;line-height:1.55;color:#cfd7e6}
+.mem b{color:#fff}
+</style>
+</head>
+<body>
+<header>
+  <h1>Valera · ТЗ UI · только 1.75</h1>
+  <p>Скругления, современные часы-скролл, круговой EQ, шторка, темы, карта жестов, удаление станций, слайд-шоу. Wake «Валера» локальный бесплатный; xiaozhi.me — бесплатная регистрация.</p>
+</header>
+<div class="layout">
+<aside class="tree">
+  <h2>Экраны</h2>
+  <button class="item active" data-s="clock"><span class="dot"></span>Циферблат</button>
+  <button class="item" data-s="weather"><span class="dot"></span>Погода</button>
+  <button class="item" data-s="play"><span class="dot"></span>Глаза · Sber</button>
+  <button class="item" data-s="slides"><span class="dot"></span>Слайд-шоу</button>
+  <button class="item" data-s="shade"><span class="dot"></span>Шторка ↓</button>
+  <button class="item" data-s="listen"><span class="dot"></span>Слушает</button>
+  <button class="item" data-s="think"><span class="dot"></span>Думает</button>
+  <button class="item" data-s="speak"><span class="dot"></span>Ответ</button>
+  <button class="item" data-s="radio"><span class="dot"></span>Радио<span class="tag ru">RU</span></button>
+  <button class="item" data-s="stations"><span class="dot"></span>Станции</button>
+  <button class="item" data-s="volume"><span class="dot"></span>Громкость</button>
+  <button class="item" data-s="wifi"><span class="dot"></span>Wi‑Fi</button>
+  <button class="item" data-s="gallery"><span class="dot"></span>Галерея</button>
+  <button class="item" data-s="map"><span class="dot"></span>Карта жестов</button>
+  <button class="item" data-s="all"><span class="dot"></span>Все окна</button>
+  <div class="note">Свайп ↓ — шторка. ←/→ — idle страницы. Долгий тап по станции — скрыть.</div>
+</aside>
+<main class="stage">
+  <h2>Предпросмотр</h2>
+  <div class="title" id="t">Циферблат</div>
+  <div class="desc" id="d">Modern Stack</div>
+  <div class="themes" id="themes">
+    <button data-th="modern" class="on">Modern</button>
+    <button data-th="neon">Neon</button>
+    <button data-th="soft">Soft</button>
+    <button data-th="retro">Retro</button>
+    <button data-th="digital">Digital</button>
+  </div>
+  <div class="watch-wrap" id="singleWrap"><div class="watch" id="watch"><canvas id="c" width="466" height="466"></canvas></div></div>
+  <div class="hint" id="hint">466×466 · тяни список / свайп ↓ для шторки</div>
+  <div class="mapbox" id="mapbox"></div>
+  <div class="grid" id="grid"></div>
+  <div class="mem"><b>Flash 16 МБ:</b> app ≈3.05/3.94 МБ (~23% свободно). Темы = палитры (0 КБ ассетов). Слайд-шоу = процедурные слайды. Удаление станций = NVS bitmask.</div>
+</main>
+</div>
+<script>
+const THEMES={
+  modern:{hh:'#FFFFFF',mm:'#FF8FA3',accent:'#FF8A3D',cyan:'#00E8FF',bg:'#000',card:'#2E3034',font:'Outfit'},
+  neon:{hh:'#00E8FF',mm:'#FF4DB8',accent:'#FF4DB8',cyan:'#7EEBFF',bg:'#000',card:'#1A2230',font:'Outfit'},
+  soft:{hh:'#FFE8EE',mm:'#FF8FA3',accent:'#FF8FA3',cyan:'#A8E6CF',bg:'#050308',card:'#2A2430',font:'Outfit'},
+  retro:{hh:'#F5C400',mm:'#C45C26',accent:'#F5C400',cyan:'#E8D5A3',bg:'#0A0800',card:'#2A2418',font:'Space Grotesk'},
+  digital:{hh:'#7CFFB2',mm:'#5EEAD4',accent:'#7CFFB2',cyan:'#7CFFB2',bg:'#000',card:'#102018',font:'IBM Plex Mono'},
+};
+let theme='modern';
+function T(){return THEMES[theme]}
+
+const ALL_STATIONS=[
+  {name:'Наше Радио',genre:'rock',color:'#E2483D',kbps:128,song:'Сети — Смайл'},
+  {name:'Европа Плюс',genre:'hits',color:'#3E7BDB',kbps:128,song:'Non-Stop Hits'},
+  {name:'Европа Плюс Москва',genre:'hits',color:'#5FA8A0',kbps:128,song:'Москва Top 40'},
+  {name:'Русское Радио',genre:'hits',color:'#C0392B',kbps:128,song:'Русские хиты'},
+  {name:'Maximum',genre:'rock',color:'#F2994A',kbps:96,song:'Rock Chart'},
+  {name:'DFM',genre:'dance',color:'#9B5CFF',kbps:96,song:'Dance Floor'},
+  {name:'Hit FM',genre:'hits',color:'#FF6A13',kbps:96,song:'Fresh Hits'},
+  {name:'Radio Record',genre:'dance',color:'#E6007E',kbps:96,song:'Record Club — Gvozd'},
+  {name:'Record VIP House',genre:'dance',color:'#C9A0FF',kbps:96,song:'Deep Set'},
+  {name:'Ретро FM',genre:'hits',color:'#C45C26',kbps:256,song:'Золотые 80-е'},
+  {name:'Дорожное радио',genre:'hits',color:'#2E86AB',kbps:128,song:'В дорогу'},
+  {name:'Вести FM',genre:'news',color:'#2E6FE0',kbps:192,song:'Выпуск новостей'},
+  {name:'Маяк',genre:'news',color:'#F5C400',kbps:192,song:'Маяк — эфир'},
+];
+let hidden=new Set(JSON.parse(localStorage.getItem('valera_hidden')||'[]'));
+function stations(){return ALL_STATIONS.filter((_,i)=>!hidden.has(i))}
+function saveHidden(){localStorage.setItem('valera_hidden',JSON.stringify([...hidden]))}
+let PLAYING_IDX=0;
+
+const META={
+  clock:{t:'Циферблат',d:'Stack HH/MM · тема меняется сверху'},
+  weather:{t:'Погода',d:'Крупная °C + дома + условие'},
+  play:{t:'Глаза · Sber',d:'Кольца + орбы + взгляд'},
+  slides:{t:'Слайд-шоу',d:'Процедурные слайды с кроссфейдом'},
+  shade:{t:'Шторка ↓',d:'Яркость · громкость · Wi‑Fi · тема · Always On'},
+  listen:{t:'Слушает',d:'Глаза + cyan круговой рот-EQ'},
+  think:{t:'Думает',d:'Спокойный violet EQ'},
+  speak:{t:'Ответ',d:'Текст + coral voice-EQ'},
+  radio:{t:'Радио',d:'Симметричные лучи + трек + большие кнопки'},
+  stations:{t:'Станции',d:'Современный скролл · долгий тап = скрыть'},
+  volume:{t:'Громкость',d:'Большие +/−'},
+  wifi:{t:'Wi‑Fi',d:'Hotspot first-boot'},
+  gallery:{t:'Галерея',d:'Крупные карточки-приложения'},
+  map:{t:'Карта жестов',d:'Idle слева · свайпы · меню'},
+  all:{t:'Все окна',d:'Сетка'},
+};
+
+const W=466,CX=233,CY=233;
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let screen='clock', t0=performance.now();
+let scrollY=0,scrollV=0,dragging=false,lastY=0,lastTs=0,longPress=null;
+let shadePull=0, shadeTarget=0, shadeDragging=false; // phone sheet 0..1
+let slideI=0, slidePhase=0;
+
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function rr(c,x,y,w,h,r){const R=Math.min(r,w/2,h/2);c.beginPath();c.moveTo(x+R,y);c.arcTo(x+w,y,x+w,y+h,R);c.arcTo(x+w,y+h,x,y+h,R);c.arcTo(x,y+h,x,y,R);c.arcTo(x,y,x+w,y,R);c.closePath()}
+function clear(c){c.fillStyle=T().bg;c.beginPath();c.arc(CX,CY,233,0,Math.PI*2);c.fill();c.save();c.beginPath();c.arc(CX,CY,233,0,Math.PI*2);c.clip()}
+function unclip(c){c.restore()}
+function font(w,s){return `${w} ${s}px ${T().font},Outfit,sans-serif`}
+function pillBtn(c,x,y,w,h,label,fill,ink){
+  rr(c,x,y,w,h,h/2);c.fillStyle=fill;c.fill();
+  c.fillStyle=ink;c.font=font(800, Math.round(h*0.32));c.textAlign='center';c.textBaseline='middle';
+  c.fillText(label,x+w/2,y+h/2+1);
+}
+function edgePill(c,label){
+  const R=227,h=84; const y1=CY+Math.sqrt(Math.max(0,R*R-170*170));
+  const y0=y1-h+20;
+  c.save();c.beginPath();c.arc(CX,CY,233,0,Math.PI*2);c.clip();
+  pillBtn(c,CX-148,y0,296,h,label,T().accent,T().bg==='#000'?'#2A1200':'#1A1008');
+  c.restore();
+}
+
+// ---- circular mouth EQ (listen/speak) ----
+function drawCircleEQ(c,t,cy,colorA,colorB,drive){
+  const n=11,mid=5,barW=13,gap=7,total=n*barW+(n-1)*gap,ox=CX-total/2;
+  for(let i=0;i<n;i++){
+    const m=i<=mid?i:n-1-i;
+    const shape=.22+.78*Math.sin((m+.5)/(mid+1)*Math.PI/2);
+    const wave=.45+.55*Math.abs(Math.sin(t*.009+m*.7));
+    const env=clamp(shape*(.35+drive*wave),.12,1);
+    const h=12+68*env;
+    c.fillStyle=m%2?colorB:colorA;
+    rr(c,ox+i*(barW+gap),cy-h/2,barW,h,barW/2);c.fill();
+  }
+}
+
+function curved(c,text,radius,a0,a1,color,size){
+  c.save();c.fillStyle=color;c.font=font(600,size);
+  const chars=[...text]; let total=0; const widths=chars.map(ch=>{const w=c.measureText(ch).width;total+=w;return w});
+  const span=a1-a0,dir=span>=0?1:-1,abs=Math.abs(span);
+  const needed=total/radius,scale=abs>0.01?Math.min(1,abs/needed):1;
+  const use=total*scale; let angle=a0+(span-dir*(use/radius))/2;
+  for(let i=0;i<chars.length;i++){
+    const w=widths[i]*scale,a=angle+dir*(w/radius)/2;
+    const x=CX+Math.cos(a)*radius,y=CY+Math.sin(a)*radius;
+    c.save();c.translate(x,y);c.rotate(a+Math.PI/2*dir);c.textAlign='center';c.textBaseline='middle';c.fillText(chars[i],0,0);c.restore();
+    angle+=dir*(w/radius);
+  }
+  c.restore();
+}
+
+function drawClock(c){
+  clear(c); const th=T();
+  const now=new Date();
+  c.textAlign='center';c.textBaseline='middle';
+  c.font=font(800, theme==='digital'?120:150);
+  c.fillStyle=th.hh;c.fillText(String(now.getHours()).padStart(2,'0'),CX,CY-78);
+  c.fillStyle=th.mm;c.fillText(String(now.getMinutes()).padStart(2,'0'),CX,CY+78);
+  if(theme==='digital'){
+    c.strokeStyle=th.cyan;c.globalAlpha=.25;c.lineWidth=1;
+    for(let y=40;y<430;y+=8){c.beginPath();c.moveTo(40,y);c.lineTo(426,y);c.stroke()}
+    c.globalAlpha=1;
+  }
+  curved(c,'ПТ  ·  BARNAUL',208,Math.PI*.55,Math.PI*1.45,'#E8EDF4',14);
+  curved(c,'−12° ОБЛАЧНО',208,-Math.PI*.35,Math.PI*.35,th.mm,14);
+  unclip(c);
+}
+function drawWeather(c){
+  clear(c);const th=T();
+  const g=c.createRadialGradient(CX,CY-140,4,CX,CY-140,36);g.addColorStop(0,'#FFE08A');g.addColorStop(1,'#F5A524');
+  c.fillStyle=g;c.beginPath();c.arc(CX,CY-140,26,0,Math.PI*2);c.fill();
+  c.textAlign='center';c.textBaseline='middle';
+  c.font=font(800,110);c.fillStyle=th.cyan;c.fillText('−12°',CX,CY-8);
+  c.font=font(700,26);c.fillStyle=th.mm;c.fillText('дома 24°',CX,CY+70);
+  c.font=font(600,18);c.fillStyle='#9AB4C8';c.fillText('ОБЛАЧНО',CX,CY+108);
+  unclip(c);
+}
+function drawEyes(c,t,playful,listening){
+  clear(c);const th=T();
+  const ew=118,eh=72*(listening?.92:.88),pr=20;
+  const lookX=Math.sin(t*.0017)*18,lookY=Math.cos(t*.0013)*8,cy=listening?180:210;
+  function eye(ecx){
+    rr(c,ecx-ew/2,cy-eh/2,ew,eh,eh/2);c.fillStyle=playful?th.cyan:'#E8EDF4';c.fill();
+    c.save();rr(c,ecx-ew/2,cy-eh/2,ew,eh,eh/2);c.clip();
+    c.fillStyle='#0A0C10';c.beginPath();c.arc(ecx+lookX,cy+lookY,pr,0,Math.PI*2);c.fill();
+    c.fillStyle='#fff';c.globalAlpha=.85;c.beginPath();c.arc(ecx+lookX-6,cy+lookY-6,4,0,Math.PI*2);c.fill();
+    c.globalAlpha=1;c.restore();
+  }
+  eye(CX-78);eye(CX+78);
+  if(listening) drawCircleEQ(c,t,320,th.cyan,'#7EEBFF',.9);
+  else if(playful){
+    c.strokeStyle=th.cyan;c.globalAlpha=.22;c.lineWidth=8;c.beginPath();c.arc(CX,CY,200,0,Math.PI*2);c.stroke();
+    c.globalAlpha=.18;c.lineWidth=5;c.beginPath();c.arc(CX,CY,168,0,Math.PI*2);c.stroke();c.globalAlpha=1;
+    for(let i=0;i<8;i++){
+      const a=t*.0008+i*.8,R=150+20*(i%3);
+      c.globalAlpha=.15+.2*Math.abs(Math.sin(t*.002+i));
+      c.fillStyle=i%2?th.mm:th.cyan;c.beginPath();c.arc(CX+Math.cos(a)*R,CY+Math.sin(a)*R,i%2?8:12,0,Math.PI*2);c.fill();
+    }
+    c.globalAlpha=1;
+  }
+  unclip(c);
+}
+function drawSpeak(c,t){
+  clear(c);const th=T();
+  for(let i=0;i<6;i++){
+    const a=t*.0007+i*1.05,R=195;
+    c.globalAlpha=.12+.25*Math.abs(Math.sin(t*.002+i));
+    c.fillStyle=i%2?th.mm:th.accent;c.beginPath();
+    c.arc(CX+Math.cos(a)*R*.8,CY+Math.sin(a*.92)*R*.8,i%2?9:14,0,Math.PI*2);c.fill();
+  }
+  c.globalAlpha=1;c.fillStyle='#F4F7FB';c.textAlign='center';c.textBaseline='middle';c.font=font(600,28);
+  ['Привет! Я Валера —','чем помочь?'].forEach((ln,i)=>c.fillText(ln,CX,CY-18+i*36));
+  drawCircleEQ(c,t,390,th.mm,th.accent,.95);
+  unclip(c);
+}
+function drawShade(c){
+  clear(c);const th=T();
+  const pull=clamp(shadePull,0,1);
+  const ease=pull*pull*(3-2*pull);
+  // dim clock behind (scrim)
+  c.globalAlpha=.18+ease*.22;c.textAlign='center';c.textBaseline='middle';c.font=font(800,90);
+  c.fillStyle='#fff';c.fillText('15',CX,CY-40);c.fillStyle=th.mm;c.fillText('22',CX,CY+50);
+  c.globalAlpha=ease*.55;c.fillStyle='#000';c.beginPath();c.arc(CX,CY,233,0,Math.PI*2);c.fill();
+  c.globalAlpha=1;
+  // sliding sheet from top
+  const sheetH=340, sheetY=-sheetH+ease*sheetH+18;
+  rr(c,28,sheetY,410,sheetH,36);c.fillStyle='rgba(18,24,32,.96)';c.fill();
+  rr(c,CX-32,sheetY+14,64,6,3);c.fillStyle='#6a7a90';c.fill();
+  c.fillStyle='#FFF8EE';c.font=font(700,18);c.textAlign='center';c.fillText('Быстрые настройки',CX,sheetY+42);
+  const rows=[['Яркость','78%'],['Громкость','60%'],['Wi‑Fi','Valera-Home'],['Тема',theme],['Always On','60 с'],['Сброс Wi‑Fi','›']];
+  rows.forEach((r,i)=>{
+    const y=sheetY+78+i*48;
+    rr(c,48,y,370,42,21);c.fillStyle='#1a2430';c.fill();
+    c.textAlign='left';c.fillStyle='#9AB4C8';c.font=font(600,15);c.fillText(r[0],70,y+22);
+    c.textAlign='right';c.fillStyle='#FFF8EE';c.font=font(600,15);c.fillText(r[1],398,y+22);
+  });
+  unclip(c);
+}
+
+// Radio rays Popka-symmetric
+const RP_A_TOP=-64,RP_A_BOT=32,RP_R0=224,RP_LMAX=58,RD_BANDS=23;
+function rpAng(side,i){const a=(RP_A_BOT+(RP_A_TOP-RP_A_BOT)*i/(RD_BANDS-1))*Math.PI/180;return side?Math.PI-a:a}
+function rpBand(i,t){const shape=.22+.78*Math.sin((i+.5)/RD_BANDS*Math.PI);const wave=.35+.65*Math.abs(Math.sin(t*.008+i*.38));return clamp(shape*wave,.08,1)}
+function drawRadio(c,t){
+  clear(c);const th=T();const list=stations();const st=list[Math.min(PLAYING_IDX,list.length-1)]||ALL_STATIONS[0];
+  for(let i=0;i<RD_BANDS;i++){
+    const level=rpBand(i,t),len=level*RP_LMAX*1.15,hw=2.6+1.4*level;
+    const col=level<.18?'#3A3A40':level<.45?'#FFB98A':level<.78?th.accent:'#FFF1E4';
+    for(let side=0;side<2;side++){
+      const ang=rpAng(side,i);
+      c.strokeStyle=col;c.lineWidth=hw*2;c.lineCap='round';
+      c.beginPath();c.moveTo(CX+Math.cos(ang)*RP_R0,CY+Math.sin(ang)*RP_R0);
+      c.lineTo(CX+Math.cos(ang)*(RP_R0-len),CY+Math.sin(ang)*(RP_R0-len));c.stroke();
+    }
+  }
+  const now=new Date();
+  c.textAlign='center';c.textBaseline='middle';c.fillStyle='#FFF8EE';
+  c.font=font(700,22);c.fillText(`${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`,CX,30);
+  c.font=font(800,34);c.fillText(st.name,CX,146);
+  c.fillStyle='#9E9E9E';c.font=font(500,16);
+  c.save();c.beginPath();rr(c,CX-140,226,280,24,12);c.clip();
+  const song=st.song||(st.genre+' · RU');
+  const tw=c.measureText(song).width,period=Math.max(tw+96,280);
+  const ox=((t/16)%period);
+  c.textAlign='left';c.fillText(song,CX-128-ox,238);c.fillText(song,CX-128-ox+period,238);c.restore();
+  c.fillStyle=th.accent;c.font=font(700,12);c.textAlign='center';
+  c.fillText('☰',CX-70,291);c.fillText('СТАНЦИИ',CX-70,314);
+  c.fillText('🔊',CX+70,291);c.fillText('ГРОМКОСТЬ',CX+70,314);
+  c.strokeStyle='#FFF8EE';c.globalAlpha=.4;c.beginPath();c.moveTo(CX,276);c.lineTo(CX,326);c.stroke();c.globalAlpha=1;
+  edgePill(c,'■  Стоп');
+  unclip(c);
+}
+
+const CARD_H=104,CARD_W=400,CARD_GAP=10,HEAD_H=64;
+function listMetrics(){
+  const items=stations().map((s,i)=>({t:s.name,s:i===0?('♪ '+s.song):(s.genre+' · '+s.kbps+' kbps'),c:s.color,live:i===0,idx:ALL_STATIONS.indexOf(s)}));
+  const contentH=HEAD_H+items.length*(CARD_H+CARD_GAP)+110;
+  return {items,maxScroll:Math.max(0,contentH-420)};
+}
+function drawStations(c){
+  clear(c);const {items,maxScroll}=listMetrics();scrollY=clamp(scrollY,0,maxScroll);
+  c.globalAlpha=clamp(1-scrollY/80,0,1);c.textAlign='center';c.textBaseline='middle';c.fillStyle='#FFF8EE';c.font=font(700,20);
+  c.fillText('Станции RU',CX,36);c.globalAlpha=1;
+  let y=70-scrollY;
+  items.forEach(it=>{
+    const mid=y+CARD_H/2,dist=Math.min(1,Math.abs(mid-CY)/210),e=dist*dist*(3-2*dist);
+    const aBg=clamp(.5+.5*(1-e),.25,1),scale=clamp(1-e*.4,.6,1),alpha=aBg*aBg;
+    const w=CARD_W*scale,h=CARD_H*scale,x=CX-w/2,yy=mid-h/2;
+    if(yy<450&&yy+h>20){
+      c.save();c.globalAlpha=alpha;
+      rr(c,x,yy,w,h,28*scale);c.fillStyle=T().card;c.fill();
+      c.beginPath();c.arc(x+42*scale,mid,24*scale,0,Math.PI*2);c.fillStyle=it.c;c.fill();
+      if(it.live){c.fillStyle='#FFF8EE';for(let b=0;b<3;b++){const bh=6+10*Math.abs(Math.sin(performance.now()*.006+b));rr(c,x+42*scale-10+b*7,mid-bh/2,4,bh,2);c.fill()}}
+      c.textAlign='left';c.fillStyle='#FFF8EE';c.font=font(700,Math.round(20*scale));c.fillText(it.t,x+78*scale,mid-(it.live?14:8)*scale);
+      c.fillStyle=it.live?'#FFB98A':'#9E9E9E';c.font=font(500,Math.round(13*scale));
+      const sub=it.s.length>32?it.s.slice(0,31)+'…':it.s;c.fillText(sub,x+78*scale,mid+(it.live?12:16)*scale);
+      // hide affordance
+      c.fillStyle='rgba(255,255,255,.12)';rr(c,x+w-52*scale,mid-14*scale,36*scale,28*scale,14*scale);c.fill();
+      c.fillStyle='#FF8A80';c.font=font(700,Math.round(16*scale));c.textAlign='center';c.fillText('×',x+w-34*scale,mid+1);
+      c.restore();
+    }
+    y+=CARD_H+CARD_GAP;
+  });
+  edgePill(c,'■  '+(stations()[0]?.name||'Радио'));
+  unclip(c);
+}
+function drawVolume(c){
+  clear(c);const th=T();c.textAlign='center';c.textBaseline='middle';
+  pillBtn(c,CX-48,70,96,72,'+',th.accent,'#2A1200');
+  c.fillStyle='#FFF8EE';c.font=font(700,28);c.fillText('🔊',CX,CY);
+  c.fillStyle='#9E9E9E';c.font=font(600,18);c.fillText('72%',CX,CY+40);
+  pillBtn(c,CX-48,340,96,72,'−',th.card,'#FFF8EE');
+  c.strokeStyle=th.accent;c.lineWidth=8;c.lineCap='round';c.beginPath();c.arc(CX,CY,150,-Math.PI*.75,Math.PI*.15);c.stroke();
+  unclip(c);
+}
+function drawWifi(c,t){
+  clear(c);const th=T();
+  c.textAlign='center';c.textBaseline='middle';
+  c.fillStyle=th.accent;c.font=font(800,28);c.fillText('Wi‑Fi',CX,70);
+  c.fillStyle='#FFF8EE';c.font=font(700,24);c.fillText('Xiaozhi-A1B2',CX,CY-36);
+  c.fillStyle='#9AB4C8';c.font=font(500,15);
+  c.fillText('1) Подключитесь к точке',CX,CY+24);
+  c.fillText('2) Браузер → 192.168.4.1',CX,CY+52);
+  const pulse=.5+.5*Math.sin(t*.005);c.strokeStyle=`rgba(255,138,61,${.35+.45*pulse})`;c.lineWidth=3;c.beginPath();c.arc(CX,CY,200,0,Math.PI*2);c.stroke();
+  unclip(c);
+}
+function drawGallery(c){
+  clear(c);c.textAlign='center';c.textBaseline='middle';c.fillStyle='#FFF8EE';c.font=font(700,22);c.fillText('Приложения',CX,40);
+  [['Погода','☁',T().cyan],['Радио RU','📻',T().accent],['Слайды','🖼',T().mm],['About','ℹ','#8FB6FF']].forEach((a,i)=>{
+    const y=78+i*88,scale=i===0?1:i===1?.96:.9,alpha=1-i*.12;
+    c.save();c.globalAlpha=alpha;c.translate(CX,y+40);c.scale(scale,scale);c.translate(-CX,-(y+40));
+    rr(c,36,y,394,80,40);c.fillStyle=T().card;c.fill();
+    c.beginPath();c.arc(86,y+40,28,0,Math.PI*2);c.fillStyle=a[2];c.fill();
+    c.textAlign='left';c.fillStyle='#FFF8EE';c.font=font(700,22);c.fillText(a[0],132,y+44);
+    c.restore();
+  });
+  unclip(c);
+}
+function drawSlides(c,t){
+  clear(c);
+  const slides=[
+    {c0:'#0a1628',c1:'#1b3a4b',label:'Северное сияние'},
+    {c0:'#1a0a08',c1:'#4a2010',label:'Тёплый закат'},
+    {c0:'#081410',c1:'#0e3a2a',label:'Изумруд'},
+    {c0:'#140818',c1:'#3a1050',label:'Ночной неон'},
+  ];
+  slidePhase=(t/5000)%slides.length; slideI=Math.floor(slidePhase); const f=slidePhase-slideI;
+  const a=slides[slideI],b=slides[(slideI+1)%slides.length];
+  function paintSlide(s,alpha){
+    const g=c.createRadialGradient(CX-40,CY-60,10,CX,CY,240);
+    g.addColorStop(0,s.c1);g.addColorStop(1,s.c0);
+    c.globalAlpha=alpha;c.fillStyle=g;c.beginPath();c.arc(CX,CY,233,0,Math.PI*2);c.fill();
+    for(let i=0;i<18;i++){c.globalAlpha=alpha*(.04+.08*(i%3));c.fillStyle='#fff';c.beginPath();c.arc(60+(i*97)%340,50+(i*53)%360,1.5,0,Math.PI*2);c.fill()}
+  }
+  paintSlide(a,1-f);paintSlide(b,f);
+  c.globalAlpha=1;c.textAlign='center';c.textBaseline='middle';
+  c.fillStyle='rgba(255,255,255,.9)';c.font=font(700,22);
+  const label=f<.5?a.label:b.label;c.fillText(label,CX,CY+150);
+  // dots
+  slides.forEach((_,i)=>{c.beginPath();c.arc(CX-30+i*20,CY+180,4,0,Math.PI*2);c.fillStyle=i===slideI?T().accent:'#555';c.fill()});
+  unclip(c);
+}
+function drawMap(c){
+  // rendered in HTML mapbox; canvas shows compact legend
+  clear(c);c.textAlign='center';c.textBaseline='middle';
+  c.fillStyle='#FFF8EE';c.font=font(700,22);c.fillText('Карта жестов',CX,70);
+  c.fillStyle='#9AB4C8';c.font=font(500,14);
+  const lines=['Idle: часы ↔ погода ↔ глаза ↔ слайды','Свайп ↓ — шторка','Свайп ←/→ — страницы idle','Галерея → Радио / Погода','Радио → Станции / Громкость','Wake «Валера» → слушает→ответ'];
+  lines.forEach((ln,i)=>c.fillText(ln,CX,130+i*36));
+  unclip(c);
+}
+
+function paint(name,c,t){
+  switch(name){
+    case 'clock':drawClock(c);break;
+    case 'weather':drawWeather(c);break;
+    case 'play':drawEyes(c,t,true,false);break;
+    case 'listen':drawEyes(c,t,false,true);break;
+    case 'think':drawEyes(c,t*.55,false,true);break;
+    case 'speak':drawSpeak(c,t);break;
+    case 'radio':drawRadio(c,t);break;
+    case 'stations':drawStations(c);break;
+    case 'volume':drawVolume(c);break;
+    case 'shade':drawShade(c);break;
+    case 'wifi':drawWifi(c,t);break;
+    case 'gallery':drawGallery(c);break;
+    case 'slides':drawSlides(c,t);break;
+    case 'map':drawMap(c);break;
+    default:drawClock(c);
+  }
+}
+
+const ALL=['clock','weather','play','slides','shade','listen','think','speak','wifi','radio','stations','volume','gallery'];
+const grid=document.getElementById('grid');
+ALL.forEach(id=>{
+  const cell=document.createElement('div');cell.className='cell';
+  const mini=document.createElement('div');mini.className='mini';
+  const cv=document.createElement('canvas');cv.width=466;cv.height=466;cv.dataset.s=id;
+  mini.appendChild(cv);cell.appendChild(mini);
+  const lab=document.createElement('div');lab.className='lab';lab.textContent=META[id].t;cell.appendChild(lab);
+  grid.appendChild(cell);
+});
+
+document.querySelectorAll('.item').forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll('.item').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');screen=btn.dataset.s;
+    const m=META[screen];document.getElementById('t').textContent=m.t;document.getElementById('d').textContent=m.d;
+    const all=screen==='all', map=screen==='map';
+    document.getElementById('singleWrap').style.display=(all||map)?'none':'flex';
+    document.getElementById('hint').style.display=(all||map)?'none':'block';
+    grid.classList.toggle('on',all);
+    document.getElementById('mapbox').classList.toggle('on',map);
+    if(map) renderMapSvg();
+    if(screen==='stations'){scrollY=0;scrollV=0}
+  };
+});
+document.querySelectorAll('#themes button').forEach(b=>{
+  b.onclick=()=>{theme=b.dataset.th;document.querySelectorAll('#themes button').forEach(x=>x.classList.toggle('on',x===b));};
+});
+
+function renderMapSvg(){
+  document.getElementById('mapbox').innerHTML=`<svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#FF8A3D"/></marker></defs>
+  <rect x="40" y="120" width="140" height="140" rx="70" fill="#111" stroke="#FF8FA3" stroke-width="3"/>
+  <text x="110" y="195" text-anchor="middle" fill="#fff" font-size="14" font-family="Outfit">Циферблат</text>
+  <text x="110" y="95" text-anchor="middle" fill="#8b95a8" font-size="12">IDLE</text>
+  <rect x="260" y="40" width="120" height="80" rx="40" fill="#151820" stroke="#5EEAD4"/>
+  <text x="320" y="85" text-anchor="middle" fill="#e8edf4" font-size="13">Погода</text>
+  <rect x="260" y="150" width="120" height="80" rx="40" fill="#151820" stroke="#7CFFB2"/>
+  <text x="320" y="195" text-anchor="middle" fill="#e8edf4" font-size="13">Глаза</text>
+  <rect x="260" y="260" width="120" height="80" rx="40" fill="#151820" stroke="#C9A0FF"/>
+  <text x="320" y="305" text-anchor="middle" fill="#e8edf4" font-size="13">Слайды</text>
+  <line x1="180" y1="160" x2="260" y2="80" stroke="#FF8A3D" marker-end="url(#a)"/>
+  <line x1="180" y1="190" x2="260" y2="190" stroke="#FF8A3D" marker-end="url(#a)"/>
+  <line x1="180" y1="220" x2="260" y2="300" stroke="#FF8A3D" marker-end="url(#a)"/>
+  <text x="210" y="130" fill="#FF8A3D" font-size="11">← →</text>
+  <rect x="460" y="40" width="140" height="70" rx="24" fill="#151820" stroke="#FF8A3D"/>
+  <text x="530" y="80" text-anchor="middle" fill="#e8edf4" font-size="13">Шторка ↓</text>
+  <line x1="110" y1="120" x2="530" y2="75" stroke="#FF8A3D" stroke-dasharray="4 4" marker-end="url(#a)"/>
+  <rect x="460" y="150" width="140" height="70" rx="24" fill="#151820" stroke="#FF8FA3"/>
+  <text x="530" y="180" text-anchor="middle" fill="#e8edf4" font-size="13">Радио</text>
+  <text x="530" y="200" text-anchor="middle" fill="#8b95a8" font-size="11">станции · громкость</text>
+  <rect x="460" y="260" width="140" height="70" rx="24" fill="#151820" stroke="#8FB6FF"/>
+  <text x="530" y="300" text-anchor="middle" fill="#e8edf4" font-size="13">Галерея</text>
+  <rect x="680" y="120" width="160" height="140" rx="24" fill="#151820" stroke="#5EEAD4"/>
+  <text x="760" y="170" text-anchor="middle" fill="#e8edf4" font-size="13">Wake «Валера»</text>
+  <text x="760" y="195" text-anchor="middle" fill="#8b95a8" font-size="11">слушает → думает</text>
+  <text x="760" y="215" text-anchor="middle" fill="#8b95a8" font-size="11">→ ответ</text>
+  <text x="760" y="245" text-anchor="middle" fill="#5EEAD4" font-size="11">бесплатно · локально</text>
+  </svg>`;
+}
+
+const watch=document.getElementById('watch');
+let pullStartY=0, pullStartPull=0;
+watch.addEventListener('pointerdown',e=>{
+  dragging=true;lastY=e.clientY;lastTs=performance.now();scrollV=0;
+  pullStartY=e.clientY;pullStartPull=shadePull;shadeDragging=false;
+  if(screen==='stations'){
+    longPress=setTimeout(()=>{
+      const list=stations(); if(!list.length)return;
+      const idx=ALL_STATIONS.indexOf(list[0]);
+      hidden.add(idx);saveHidden();
+      alert('Станция скрыта (localStorage). Восстановить: очистите valera_hidden.');
+    },650);
+  }
+  watch.setPointerCapture(e.pointerId);
+});
+watch.addEventListener('pointermove',e=>{
+  if(!dragging)return;
+  if(longPress){clearTimeout(longPress);longPress=null}
+  const dy=e.clientY-lastY, now=performance.now(), dt=Math.max(1,now-lastTs);
+  const scale=466/watch.clientWidth;
+  const totalDy=(e.clientY-pullStartY)*scale;
+  if(screen==='stations'){
+    scrollY-=dy*scale;scrollV=-dy*scale/(dt/16);
+    const {maxScroll}=listMetrics();scrollY=clamp(scrollY,0,maxScroll);
+  } else if(screen==='shade'||screen==='clock'||screen==='weather'||screen==='play'||screen==='slides'){
+    // Interactive phone-like shade pull
+    if(screen!=='shade' && totalDy>12){
+      document.querySelector('[data-s=shade]').click();
+      shadePull=clamp(totalDy/340,0,1); shadeDragging=true;
+    } else if(screen==='shade'){
+      shadeDragging=true;
+      shadePull=clamp(pullStartPull+totalDy/340,0,1);
+    }
+  }
+  lastY=e.clientY;lastTs=now;
+});
+watch.addEventListener('pointerup',()=>{
+  if(shadeDragging){
+    shadeTarget=shadePull>0.42?1:0;
+    if(shadeTarget<0.5 && screen==='shade'){ /* spring close stays on shade until settled */ }
+  }
+  dragging=false;shadeDragging=false;
+  if(longPress){clearTimeout(longPress);longPress=null}
+});
+watch.addEventListener('pointercancel',()=>{dragging=false;shadeDragging=false;if(longPress){clearTimeout(longPress);longPress=null}});
+
+// When opening shade via menu — spring to open
+document.querySelectorAll('.item').forEach(btn=>{
+  const prev=btn.onclick;
+  btn.addEventListener('click',()=>{
+    if(btn.dataset.s==='shade'){shadeTarget=1; if(shadePull<0.05) shadePull=0.08}
+    else {shadeTarget=0}
+  });
+});
+
+function frame(ts){
+  const t=ts-t0;
+  if(!shadeDragging){
+    const d=shadeTarget-shadePull;
+    if(Math.abs(d)>0.004) shadePull+=d*0.22; else shadePull=shadeTarget;
+  }
+  if(screen==='stations'&&!dragging){scrollY+=scrollV;scrollV*=.92;if(Math.abs(scrollV)<.05)scrollV=0;const {maxScroll}=listMetrics();scrollY=clamp(scrollY,0,maxScroll)}
+  if(screen!=='all'&&screen!=='map') paint(screen,ctx,t);
+  grid.querySelectorAll('canvas').forEach(cv=>paint(cv.dataset.s,cv.getContext('2d'),t));
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

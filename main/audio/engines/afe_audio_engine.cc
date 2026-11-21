@@ -12,6 +12,7 @@
 
 #include "audio_service.h"
 #include "wake_words/custom_wake_word.h"
+#include "wake_words/valera_ru_ear.h"
 
 #define TAG "AfeAudioEngine"
 
@@ -25,6 +26,7 @@ AfeAudioEngine::AfeAudioEngine() { event_group_ = xEventGroupCreate(); }
 
 AfeAudioEngine::~AfeAudioEngine() {
     custom_wake_word_.reset();
+    valera_ru_ear_.reset();
     if (afe_data_ != nullptr) {
         afe_iface_->destroy(afe_data_);
     }
@@ -70,11 +72,7 @@ bool AfeAudioEngine::Initialize(AudioCodec* codec, int frame_duration_ms,
         models_ = models_list;
     }
 
-    char* wakenet_model_name = nullptr;
-    char* multinet_model_name = nullptr;
     if (models_ != nullptr && models_->num > 0) {
-        wakenet_model_name = esp_srmodel_filter(models_, ESP_WN_PREFIX, nullptr);
-        multinet_model_name = esp_srmodel_filter(models_, ESP_MN_PREFIX, nullptr);
         for (int i = 0; i < models_->num; ++i) {
             const char* info =
                 models_->model_info != nullptr ? models_->model_info[i] : nullptr;
@@ -83,6 +81,28 @@ bool AfeAudioEngine::Initialize(AudioCodec* codec, int frame_duration_ms,
         }
     }
 
+#if CONFIG_USE_VALERA_RU_LOCAL_EAR
+    wake_detector_ = WakeDetector::kValeraRuEar;
+    valera_ru_ear_ = std::make_unique<ValeraRuEar>();
+    valera_ru_ear_->OnWakeWordDetected([this](const std::string& wake_word) {
+        last_detected_wake_word_ = wake_word;
+        xEventGroupClearBits(event_group_, kWakeWordEnabled);
+        UpdateActiveState();
+        if (wake_word_detected_callback_) {
+            wake_word_detected_callback_(wake_word);
+        }
+    });
+    if (!valera_ru_ear_->Initialize(codec_, models_)) {
+        ESP_LOGE(TAG, "Failed to initialize Valera local Russian ear");
+        valera_ru_ear_.reset();
+        wake_detector_ = WakeDetector::kNone;
+        return false;
+    }
+#else
+    char* wakenet_model_name =
+        models_ != nullptr ? esp_srmodel_filter(models_, ESP_WN_PREFIX, nullptr) : nullptr;
+    char* multinet_model_name =
+        models_ != nullptr ? esp_srmodel_filter(models_, ESP_MN_PREFIX, nullptr) : nullptr;
     if (multinet_model_name != nullptr) {
         wake_detector_ = WakeDetector::kMultiNet;
         custom_wake_word_ = std::make_unique<CustomWakeWord>();
@@ -125,6 +145,7 @@ bool AfeAudioEngine::Initialize(AudioCodec* codec, int frame_duration_ms,
         }
 #endif
     }
+#endif
 
     const bool needs_afe = kUseAfeForVoiceProcessing || wake_detector_ != WakeDetector::kNone;
     if (!needs_afe) {
@@ -307,12 +328,16 @@ void AfeAudioEngine::EnableWakeWordDetection(bool enable) {
     if (enable) {
         if (wake_detector_ == WakeDetector::kMultiNet) {
             custom_wake_word_->Start();
+        } else if (wake_detector_ == WakeDetector::kValeraRuEar) {
+            valera_ru_ear_->Start();
         }
         xEventGroupSetBits(event_group_, kWakeWordEnabled);
     } else {
         xEventGroupClearBits(event_group_, kWakeWordEnabled);
         if (wake_detector_ == WakeDetector::kMultiNet) {
             custom_wake_word_->Stop();
+        } else if (wake_detector_ == WakeDetector::kValeraRuEar) {
+            valera_ru_ear_->Stop();
         }
     }
     UpdateActiveState();
@@ -473,6 +498,10 @@ void AfeAudioEngine::HandleWakeWordResult(const afe_fetch_result_t* result) {
         custom_wake_word_->FeedMono(result->data, result->data_size / sizeof(int16_t));
         return;
     }
+    if (wake_detector_ == WakeDetector::kValeraRuEar) {
+        valera_ru_ear_->FeedMono(result->data, result->data_size / sizeof(int16_t));
+        return;
+    }
 
 #if CONFIG_SEND_WAKE_WORD_DATA
     wake_word_audio_cache_.Store(result->data, result->data_size / sizeof(int16_t));
@@ -561,6 +590,10 @@ void AfeAudioEngine::OutputRawAudio(const std::vector<int16_t>& data) {
 void AfeAudioEngine::EncodeWakeWordData() {
     if (wake_detector_ == WakeDetector::kMultiNet) {
         custom_wake_word_->EncodeWakeWordData();
+        return;
+    }
+    if (wake_detector_ == WakeDetector::kValeraRuEar) {
+        valera_ru_ear_->EncodeWakeWordData();
         return;
     }
     if (wake_detector_ != WakeDetector::kWakeNet) {
@@ -652,6 +685,9 @@ void AfeAudioEngine::EncodeWakeWordData() {
 bool AfeAudioEngine::GetWakeWordOpus(std::vector<uint8_t>& opus) {
     if (wake_detector_ == WakeDetector::kMultiNet) {
         return custom_wake_word_->GetWakeWordOpus(opus);
+    }
+    if (wake_detector_ == WakeDetector::kValeraRuEar) {
+        return valera_ru_ear_->GetWakeWordOpus(opus);
     }
     if (wake_detector_ != WakeDetector::kWakeNet) {
         return false;

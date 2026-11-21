@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <string>
 
 #define TAG "ValeraFace"
 
@@ -502,7 +503,7 @@ void ValeraLcdDisplay::BuildFace() {
     SetGroupHidden(reply_objs_, reply_obj_n_, true);
     SetGroupHidden(wifi_objs_, wifi_obj_n_, true);
     SetGroupHidden(slide_objs_, slide_obj_n_, true);
-    SetGroupHidden(shade_objs_, shade_obj_n_, true);
+    // Shade starts closed via SetShadePull(0) in BuildShade.
     PickGazeTarget(play_eye_w_ * 0.18f, play_eye_h_ * 0.16f);
     next_blink_tick_ = 100 + (rand() % 120);
 }
@@ -522,60 +523,122 @@ void ValeraLcdDisplay::SetGroupHidden(lv_obj_t* const* objs, int n, bool hidden)
 
 void ValeraLcdDisplay::BuildShade() {
     auto* theme = static_cast<LvglTheme*>(current_theme_);
-    const lv_font_t* text_font = theme ? theme->text_font()->font() : nullptr;
-    const int panel_h = (int)(LV_VER_RES * 0.72f);
+    const lv_font_t* text_font =
+        (theme && theme->text_font()) ? theme->text_font()->font() : nullptr;
+    shade_panel_h_ = (int)(LV_VER_RES * 0.78f);
+    const int row_h = 56;
+    const int row_gap = 8;
+    const int row_w = LV_HOR_RES - 56;
+
+    // Dim scrim behind the sheet (phone Control Center feel).
+    shade_scrim_ = MakePlain(root_);
+    lv_obj_set_size(shade_scrim_, LV_HOR_RES, LV_VER_RES);
+    lv_obj_set_pos(shade_scrim_, 0, 0);
+    lv_obj_set_style_bg_color(shade_scrim_, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_bg_opa(shade_scrim_, LV_OPA_TRANSP, 0);
+    lv_obj_clear_flag(shade_scrim_, LV_OBJ_FLAG_CLICKABLE);
+    Track(shade_objs_, &shade_obj_n_, 20, shade_scrim_);
 
     shade_panel_ = MakePlain(root_);
-    lv_obj_set_size(shade_panel_, LV_HOR_RES, panel_h);
-    lv_obj_align(shade_panel_, LV_ALIGN_TOP_MID, 0, 0);
-    lv_obj_set_style_radius(shade_panel_, 36, 0);
-    lv_obj_set_style_bg_color(shade_panel_, lv_color_hex(0x101820), 0);
+    lv_obj_set_size(shade_panel_, LV_HOR_RES, shade_panel_h_);
+    lv_obj_set_pos(shade_panel_, 0, -shade_panel_h_);
+    lv_obj_set_style_radius(shade_panel_, 40, 0);
+    lv_obj_set_style_bg_color(shade_panel_, lv_color_hex(0x121820), 0);
     lv_obj_set_style_bg_opa(shade_panel_, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(shade_panel_, 2, 0);
-    lv_obj_set_style_border_color(shade_panel_, lv_color_hex(0x2a3648), 0);
+    lv_obj_set_style_border_width(shade_panel_, 0, 0);
+    lv_obj_set_style_shadow_width(shade_panel_, 28, 0);
+    lv_obj_set_style_shadow_opa(shade_panel_, LV_OPA_40, 0);
+    lv_obj_set_style_shadow_color(shade_panel_, lv_color_hex(0x000000), 0);
     lv_obj_add_flag(shade_panel_, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(shade_panel_, GestureEventCb, LV_EVENT_PRESSED, this);
-    lv_obj_add_event_cb(shade_panel_, GestureEventCb, LV_EVENT_RELEASED, this);
-    lv_obj_add_event_cb(shade_panel_, GestureEventCb, LV_EVENT_PRESSING, this);
-    Track(shade_objs_, &shade_obj_n_, 16, shade_panel_);
+    // Gestures only on root_ — avoid double handlers on panel.
+    Track(shade_objs_, &shade_obj_n_, 20, shade_panel_);
 
     shade_handle_ = MakePlain(shade_panel_);
-    lv_obj_set_size(shade_handle_, 56, 6);
-    lv_obj_align(shade_handle_, LV_ALIGN_TOP_MID, 0, 14);
+    lv_obj_set_size(shade_handle_, 64, 6);
+    lv_obj_align(shade_handle_, LV_ALIGN_TOP_MID, 0, 16);
     lv_obj_set_style_radius(shade_handle_, 4, 0);
     lv_obj_set_style_bg_color(shade_handle_, lv_color_hex(0x6a7a90), 0);
     lv_obj_set_style_bg_opa(shade_handle_, LV_OPA_COVER, 0);
 
     shade_title_ = lv_label_create(shade_panel_);
-    lv_label_set_text(shade_title_, "Настройки");
+    lv_label_set_text(shade_title_, "Быстрые настройки");
     lv_obj_set_style_text_color(shade_title_, kWhite, 0);
     lv_obj_set_style_text_align(shade_title_, LV_TEXT_ALIGN_CENTER, 0);
     if (text_font) lv_obj_set_style_text_font(shade_title_, text_font, 0);
     lv_obj_align(shade_title_, LV_ALIGN_TOP_MID, 0, 36);
 
-    static const char* kRowInit[6] = {
-        "Яркость  —", "Громкость  —", "Wi‑Fi  —", "Тема  Modern", "Always On  15 с", "Сброс Wi‑Fi  ›",
-    };
+    static const char* kLabels[6] = {"Яркость", "Громкость", "Wi‑Fi",
+                                     "Тема", "Always On", "Сброс Wi‑Fi"};
     for (int i = 0; i < 6; ++i) {
-        shade_rows_[i] = lv_label_create(shade_panel_);
-        lv_label_set_text(shade_rows_[i], kRowInit[i]);
-        lv_obj_set_width(shade_rows_[i], LV_HOR_RES - 80);
-        lv_label_set_long_mode(shade_rows_[i], LV_LABEL_LONG_CLIP);
-        lv_obj_set_style_text_color(shade_rows_[i], kEdge, 0);
-        lv_obj_set_style_text_align(shade_rows_[i], LV_TEXT_ALIGN_CENTER, 0);
-        if (text_font) lv_obj_set_style_text_font(shade_rows_[i], text_font, 0);
-        lv_obj_align(shade_rows_[i], LV_ALIGN_TOP_MID, 0, 78 + i * 42);
-        lv_obj_add_flag(shade_rows_[i], LV_OBJ_FLAG_CLICKABLE);
+        shade_row_btn_[i] = MakePlain(shade_panel_);
+        lv_obj_set_size(shade_row_btn_[i], row_w, row_h);
+        lv_obj_align(shade_row_btn_[i], LV_ALIGN_TOP_MID, 0, 78 + i * (row_h + row_gap));
+        lv_obj_set_style_radius(shade_row_btn_[i], row_h / 2, 0);
+        lv_obj_set_style_bg_color(shade_row_btn_[i], lv_color_hex(0x1a2430), 0);
+        lv_obj_set_style_bg_opa(shade_row_btn_[i], LV_OPA_COVER, 0);
+        lv_obj_clear_flag(shade_row_btn_[i], LV_OBJ_FLAG_CLICKABLE);
+
+        shade_row_label_[i] = lv_label_create(shade_row_btn_[i]);
+        lv_label_set_text(shade_row_label_[i], kLabels[i]);
+        lv_obj_set_style_text_color(shade_row_label_[i], kEdge, 0);
+        if (text_font) lv_obj_set_style_text_font(shade_row_label_[i], text_font, 0);
+        lv_obj_align(shade_row_label_[i], LV_ALIGN_LEFT_MID, 22, 0);
+
+        shade_row_value_[i] = lv_label_create(shade_row_btn_[i]);
+        lv_label_set_text(shade_row_value_[i], "—");
+        lv_obj_set_style_text_color(shade_row_value_[i], kWhite, 0);
+        if (text_font) lv_obj_set_style_text_font(shade_row_value_[i], text_font, 0);
+        lv_obj_align(shade_row_value_[i], LV_ALIGN_RIGHT_MID, -22, 0);
+    }
+
+    shade_pull_ = 0.f;
+    shade_target_ = 0.f;
+    SetShadePull(0.f);
+}
+
+void ValeraLcdDisplay::SetShadePull(float pull) {
+    pull = Clampf(pull, 0.f, 1.f);
+    shade_pull_ = pull;
+    shade_open_ = pull > 0.02f;
+    if (!shade_panel_ || !shade_scrim_) return;
+
+    // Ease for soft settle feel while dragging still maps linearly.
+    const float eased = Smoothstep(pull);
+    const int y = (int)(-shade_panel_h_ + eased * shade_panel_h_);
+    lv_obj_set_y(shade_panel_, y);
+
+    const lv_opa_t scrim = (lv_opa_t)(0 + (int)(140 * eased));
+    lv_obj_set_style_bg_opa(shade_scrim_, scrim, 0);
+
+    if (pull <= 0.001f) {
+        lv_obj_add_flag(shade_panel_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(shade_scrim_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_clear_flag(shade_panel_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(shade_scrim_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(shade_scrim_);
+        lv_obj_move_foreground(shade_panel_);
     }
 }
 
 void ValeraLcdDisplay::ShowShade(bool open) {
-    shade_open_ = open;
-    SetGroupHidden(shade_objs_, shade_obj_n_, !open);
+    shade_dragging_ = false;
+    shade_target_ = open ? 1.f : 0.f;
     if (open) {
         RefreshShade();
-        if (shade_panel_) lv_obj_move_foreground(shade_panel_);
+        if (shade_pull_ < 0.05f) SetShadePull(0.08f);  // kick spring start
     }
+}
+
+void ValeraLcdDisplay::AnimateShadeTick() {
+    if (shade_dragging_) return;
+    const float diff = shade_target_ - shade_pull_;
+    if (fabsf(diff) < 0.004f) {
+        if (shade_pull_ != shade_target_) SetShadePull(shade_target_);
+        return;
+    }
+    // Critically-damped-ish lerp → ~220 ms settle at 60 fps.
+    SetShadePull(shade_pull_ + diff * 0.22f);
 }
 
 void ValeraLcdDisplay::RefreshShade() {
@@ -588,30 +651,74 @@ void ValeraLcdDisplay::RefreshShade() {
     static const char* kThemeName[] = {"Modern", "Neon", "Soft", "Retro", "Digital"};
     const char* theme_name = kThemeName[(clock_look_ >= 0 && clock_look_ <= 4) ? clock_look_ : 0];
 
-    char buf[64];
-    if (shade_rows_[0]) {
-        snprintf(buf, sizeof(buf), "Яркость  %d%%", bright);
-        lv_label_set_text(shade_rows_[0], buf);
+    char buf[48];
+    if (shade_row_value_[0]) {
+        snprintf(buf, sizeof(buf), "%d%%", bright);
+        lv_label_set_text(shade_row_value_[0], buf);
     }
-    if (shade_rows_[1]) {
-        snprintf(buf, sizeof(buf), "Громкость  %d%%", vol);
-        lv_label_set_text(shade_rows_[1], buf);
+    if (shade_row_value_[1]) {
+        snprintf(buf, sizeof(buf), "%d%%", vol);
+        lv_label_set_text(shade_row_value_[1], buf);
     }
-    if (shade_rows_[2]) {
-        lv_label_set_text(shade_rows_[2], "Wi‑Fi  Valera");
+    if (shade_row_value_[2]) {
+        auto& wifi = WifiManager::GetInstance();
+        if (wifi.IsConfigMode()) {
+            lv_label_set_text(shade_row_value_[2], "настройка");
+        } else {
+            std::string ssid = wifi.GetSsid();
+            if (ssid.empty()) ssid = "нет сети";
+            if (ssid.size() > 14) ssid = ssid.substr(0, 13) + "…";
+            lv_label_set_text(shade_row_value_[2], ssid.c_str());
+        }
     }
-    if (shade_rows_[3]) {
-        snprintf(buf, sizeof(buf), "Тема  %s", theme_name);
-        lv_label_set_text(shade_rows_[3], buf);
-    }
-    if (shade_rows_[4]) lv_label_set_text(shade_rows_[4], "Always On  15 с");
-    if (shade_rows_[5]) lv_label_set_text(shade_rows_[5], "Сброс Wi‑Fi  ›");
+    if (shade_row_value_[3]) lv_label_set_text(shade_row_value_[3], theme_name);
+    if (shade_row_value_[4]) lv_label_set_text(shade_row_value_[4], "60 с");
+    if (shade_row_value_[5]) lv_label_set_text(shade_row_value_[5], "›");
 }
 
 void ValeraLcdDisplay::CycleTheme() {
     const int next = (clock_look_ + 1) % 5;
     SetClockStyle(next, clock_scale_pct_, clock_hh_color_, clock_mm_color_);
     RefreshShade();
+}
+
+void ValeraLcdDisplay::HandleShadeTap(int16_t x, int16_t y) {
+    (void)x;
+    if (!shade_panel_ || shade_pull_ < 0.85f) return;
+    // Row hit-test in panel local coords (panel y ≈ 0 when open).
+    const int local_y = y - lv_obj_get_y(shade_panel_);
+    for (int i = 0; i < 6; ++i) {
+        if (!shade_row_btn_[i]) continue;
+        const int top = lv_obj_get_y(shade_row_btn_[i]);
+        const int bot = top + lv_obj_get_height(shade_row_btn_[i]);
+        if (local_y < top || local_y > bot) continue;
+        // Press feedback
+        lv_obj_set_style_bg_color(shade_row_btn_[i], lv_color_hex(0x243040), 0);
+        if (i == 0) {
+            if (auto* bl = Board::GetInstance().GetBacklight()) {
+                int b = bl->brightness() + 15;
+                if (b > 100) b = 20;
+                bl->SetBrightness((uint8_t)b, true);
+            }
+        } else if (i == 1) {
+            if (auto* codec = Board::GetInstance().GetAudioCodec()) {
+                int v = codec->output_volume() + 10;
+                if (v > 100) v = 20;
+                codec->SetOutputVolume(v);
+            }
+        } else if (i == 3) {
+            CycleTheme();
+        } else if (i == 5) {
+            ShowShade(false);
+            Application::GetInstance().Schedule([]() {
+                auto* wifi = static_cast<WifiBoard*>(&Board::GetInstance());
+                wifi->EnterWifiConfigMode();
+            });
+        }
+        RefreshShade();
+        lv_obj_set_style_bg_color(shade_row_btn_[i], lv_color_hex(0x1a2430), 0);
+        return;
+    }
 }
 
 void ValeraLcdDisplay::GestureEventCb(lv_event_t* e) {
@@ -628,17 +735,28 @@ void ValeraLcdDisplay::OnGesture(lv_event_t* e) {
 
     if (code == LV_EVENT_PRESSED) {
         gesture_tracking_ = true;
+        shade_dragging_ = false;
         gesture_start_x_ = p.x;
         gesture_start_y_ = p.y;
+        gesture_last_y_ = p.y;
+        gesture_from_top_ = (p.y < 64) || (shade_pull_ > 0.15f);
         return;
     }
     if (!gesture_tracking_) return;
 
     if (code == LV_EVENT_PRESSING) {
-        // Live pull preview: open shade early when dragging from top.
-        if (!shade_open_ && !assistant_active_ && gesture_start_y_ < 48 &&
-            (p.y - gesture_start_y_) > 36) {
-            ShowShade(true);
+        gesture_last_y_ = p.y;
+        if (assistant_active_ && shade_pull_ < 0.05f) return;
+        const int dy = p.y - gesture_start_y_;
+        // Interactive pull: from top edge or while shade already open.
+        if (gesture_from_top_ && (shade_pull_ > 0.05f || dy > 8)) {
+            shade_dragging_ = true;
+            float pull = shade_open_ ? (1.f + (float)dy / (float)shade_panel_h_)
+                                     : ((float)dy / (float)shade_panel_h_);
+            if (!shade_open_ && shade_pull_ < 0.05f && dy > 0) {
+                RefreshShade();
+            }
+            SetShadePull(pull);
         }
         return;
     }
@@ -650,52 +768,39 @@ void ValeraLcdDisplay::OnGesture(lv_event_t* e) {
     const int adx = dx < 0 ? -dx : dx;
     const int ady = dy < 0 ? -dy : dy;
 
-    // Shade open: tap theme / Wi‑Fi reset, or swipe up to close.
-    if (shade_open_) {
-        if (dy < -40 && ady > adx) {
+    if (shade_dragging_) {
+        shade_dragging_ = false;
+        // Velocity-ish: if pulled past mid or flung open → commit.
+        const float commit = (shade_pull_ > 0.42f) || (dy > 90) ? 1.f : 0.f;
+        // Closing fling upward
+        const float close = (dy < -50 && shade_pull_ < 0.85f) ? 0.f : commit;
+        shade_target_ = (dy < -40) ? 0.f : close;
+        if (shade_target_ > 0.5f) RefreshShade();
+        return;
+    }
+
+    if (shade_pull_ > 0.85f) {
+        if (dy < -48 && ady > adx) {
             ShowShade(false);
             return;
         }
-        // Tap rows roughly by Y inside panel.
-        if (adx < 18 && ady < 18) {
-            const int row = (p.y - 78) / 42;
-            if (row == 0) {
-                if (auto* bl = Board::GetInstance().GetBacklight()) {
-                    int b = bl->brightness() + 15;
-                    if (b > 100) b = 20;
-                    bl->SetBrightness((uint8_t)b, true);
-                }
-                RefreshShade();
-            } else if (row == 1) {
-                if (auto* codec = Board::GetInstance().GetAudioCodec()) {
-                    int v = codec->output_volume() + 10;
-                    if (v > 100) v = 20;
-                    codec->SetOutputVolume(v);
-                }
-                RefreshShade();
-            } else if (row == 3) {
-                CycleTheme();
-            } else if (row == 5) {
-                ShowShade(false);
-                Application::GetInstance().Schedule([]() {
-                    auto* wifi = static_cast<WifiBoard*>(&Board::GetInstance());
-                    wifi->EnterWifiConfigMode();
-                });
-            }
+        if (adx < 22 && ady < 22) {
+            HandleShadeTap(p.x, p.y);
         }
         return;
     }
 
     if (assistant_active_) return;
 
-    // Swipe down from top → shade
-    if (gesture_start_y_ < 56 && dy > 48 && ady > adx) {
+    // Swipe down from top → open shade (spring)
+    if (gesture_start_y_ < 72 && dy > 40 && ady > adx) {
         ShowShade(true);
         return;
     }
-    // Horizontal swipe → idle pages
+    // Horizontal swipe ↔ idle pages (direction-aware)
     if (adx > 56 && adx > ady * 1.2f) {
-        AdvanceIdlePage();
+        if (dx < 0) AdvanceIdlePage();
+        else RetreatIdlePage();
     }
 }
 
@@ -732,15 +837,23 @@ void ValeraLcdDisplay::ShowIdlePage(IdlePage page) {
 
 void ValeraLcdDisplay::AdvanceIdlePage() {
     static const IdlePage kSeq[] = {IdlePage::kClock, IdlePage::kWeather, IdlePage::kPlay,
-                                    IdlePage::kSlides, IdlePage::kClock, IdlePage::kWeather};
-    idle_step_ = (idle_step_ + 1) % 6;
+                                    IdlePage::kSlides};
+    idle_step_ = (idle_step_ + 1) % 4;
+    ShowIdlePage(kSeq[idle_step_]);
+}
+
+void ValeraLcdDisplay::RetreatIdlePage() {
+    static const IdlePage kSeq[] = {IdlePage::kClock, IdlePage::kWeather, IdlePage::kPlay,
+                                    IdlePage::kSlides};
+    idle_step_ = (idle_step_ + 3) % 4;
     ShowIdlePage(kSeq[idle_step_]);
 }
 
 void ValeraLcdDisplay::LayoutForActive(bool active) {
     assistant_active_ = active;
     if (active) {
-        ShowShade(false);
+        shade_target_ = 0.f;
+        SetShadePull(0.f);
         SetGroupHidden(clock_objs_, clock_obj_n_, true);
         SetGroupHidden(weather_objs_, weather_obj_n_, true);
         SetGroupHidden(play_objs_, play_obj_n_, true);
@@ -850,6 +963,7 @@ void ValeraLcdDisplay::Tick() {
     }
     if (want != active_mode_) SetActiveMode(want);
 
+    AnimateShadeTick();
     AnimateAmbient();
 
     if (assistant_active_) {

@@ -60,7 +60,6 @@ private:
 
     void SetActiveMode(ActiveMode mode);
     void ShowIdlePage(IdlePage page);
-    void AdvanceIdlePage();
     void LayoutForActive(bool active);
     void ApplyCaption();
     void SyncActiveStage();
@@ -76,8 +75,13 @@ private:
 
     void BuildShade();
     void ShowShade(bool open);
+    void SetShadePull(float pull);  // 0=closed … 1=open (finger / spring)
+    void AnimateShadeTick();
     void RefreshShade();
     void CycleTheme();
+    void HandleShadeTap(int16_t x, int16_t y);
+    void AdvanceIdlePage();
+    void RetreatIdlePage();
     static void GestureEventCb(lv_event_t* e);
     void OnGesture(lv_event_t* e);
 
@@ -161,17 +165,26 @@ private:
     lv_obj_t* wifi_objs_[12] = {};
     int wifi_obj_n_ = 0;
 
-    // Phone-like shade (swipe down from top).
+    // Phone-like shade (swipe-down sheet, ~60 fps spring).
+    lv_obj_t* shade_scrim_ = nullptr;
     lv_obj_t* shade_panel_ = nullptr;
     lv_obj_t* shade_handle_ = nullptr;
     lv_obj_t* shade_title_ = nullptr;
-    lv_obj_t* shade_rows_[6] = {};
-    lv_obj_t* shade_objs_[16] = {};
+    lv_obj_t* shade_row_btn_[6] = {};
+    lv_obj_t* shade_row_label_[6] = {};
+    lv_obj_t* shade_row_value_[6] = {};
+    lv_obj_t* shade_objs_[20] = {};
     int shade_obj_n_ = 0;
+    int shade_panel_h_ = 0;
+    float shade_pull_ = 0.f;     // visual 0..1
+    float shade_target_ = 0.f;   // spring target
     bool shade_open_ = false;
+    bool shade_dragging_ = false;
     bool gesture_tracking_ = false;
+    bool gesture_from_top_ = false;
     int16_t gesture_start_x_ = 0;
     int16_t gesture_start_y_ = 0;
+    int16_t gesture_last_y_ = 0;
 
     lv_timer_t* timer_ = nullptr;
 

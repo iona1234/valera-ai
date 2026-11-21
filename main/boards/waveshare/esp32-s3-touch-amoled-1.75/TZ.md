@@ -54,7 +54,7 @@
 | # | Пункт | Статус |
 | --- | --- | --- |
 | 1 | Визуал (скругления, скролл, EQ, кнопки) | Превью + LVGL face; железная проверка после прихода платы |
-| 2 | Шторка ↓ | LVGL overlay + жесты; превью полное |
+| 2 | Шторка ↓ | Плавный pull 0…1 + пружина ~60 fps; pill-кнопки; scrim |
 | 3 | Темы Modern/Neon/Soft/Retro/Digital | MCP `clock_style` look 0–4, NVS |
 | 4 | Карта экранов | `ui-preview.html` + `14-map.webp` |
 | 5 | Wake «Валера» + Seeed | Локальный EAR бесплатно; xiaozhi.me free; Seeed ≠ подписка |

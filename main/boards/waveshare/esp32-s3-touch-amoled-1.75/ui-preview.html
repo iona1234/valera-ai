@@ -144,7 +144,7 @@ const canvas=document.getElementById('c');
 const ctx=canvas.getContext('2d');
 let screen='clock', t0=performance.now();
 let scrollY=0,scrollV=0,dragging=false,lastY=0,lastTs=0,longPress=null;
-let shadePull=0; // 0..1 overlay
+let shadePull=0, shadeTarget=0, shadeDragging=false; // phone sheet 0..1
 let slideI=0, slidePhase=0;
 
 function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
@@ -260,19 +260,24 @@ function drawSpeak(c,t){
 }
 function drawShade(c){
   clear(c);const th=T();
-  // dim clock behind
-  c.globalAlpha=.2;c.textAlign='center';c.textBaseline='middle';c.font=font(800,90);
-  c.fillStyle='#fff';c.fillText('15',CX,CY-40);c.fillStyle=th.mm;c.fillText('22',CX,CY+50);c.globalAlpha=1;
-  rr(c,42,58,382,320,32);c.fillStyle='rgba(16,18,24,.94)';c.fill();
-  c.strokeStyle='rgba(255,255,255,.06)';c.lineWidth=1;rr(c,42,58,382,320,32);c.stroke();
-  // grabber
-  rr(c,CX-28,70,56,5,3);c.fillStyle='#5a6478';c.fill();
-  const rows=[['Яркость','████████░░'],['Громкость','██████░░░░'],['Wi‑Fi','Valera-Home'],['Тема',theme],['Always On','15 с'],['Сброс Wi‑Fi','›']];
+  const pull=clamp(shadePull,0,1);
+  const ease=pull*pull*(3-2*pull);
+  // dim clock behind (scrim)
+  c.globalAlpha=.18+ease*.22;c.textAlign='center';c.textBaseline='middle';c.font=font(800,90);
+  c.fillStyle='#fff';c.fillText('15',CX,CY-40);c.fillStyle=th.mm;c.fillText('22',CX,CY+50);
+  c.globalAlpha=ease*.55;c.fillStyle='#000';c.beginPath();c.arc(CX,CY,233,0,Math.PI*2);c.fill();
+  c.globalAlpha=1;
+  // sliding sheet from top
+  const sheetH=340, sheetY=-sheetH+ease*sheetH+18;
+  rr(c,28,sheetY,410,sheetH,36);c.fillStyle='rgba(18,24,32,.96)';c.fill();
+  rr(c,CX-32,sheetY+14,64,6,3);c.fillStyle='#6a7a90';c.fill();
+  c.fillStyle='#FFF8EE';c.font=font(700,18);c.textAlign='center';c.fillText('Быстрые настройки',CX,sheetY+42);
+  const rows=[['Яркость','78%'],['Громкость','60%'],['Wi‑Fi','Valera-Home'],['Тема',theme],['Always On','60 с'],['Сброс Wi‑Fi','›']];
   rows.forEach((r,i)=>{
-    const y=108+i*42;
-    rr(c,62,y-18,342,36,18);c.fillStyle='#1a2030';c.fill();
-    c.textAlign='left';c.fillStyle='#9E9E9E';c.font=font(600,14);c.fillText(r[0],80,y);
-    c.textAlign='right';c.fillStyle='#FFF8EE';c.font=font(600,14);c.fillText(r[1],382,y);
+    const y=sheetY+78+i*48;
+    rr(c,48,y,370,42,21);c.fillStyle='#1a2430';c.fill();
+    c.textAlign='left';c.fillStyle='#9AB4C8';c.font=font(600,15);c.fillText(r[0],70,y+22);
+    c.textAlign='right';c.fillStyle='#FFF8EE';c.font=font(600,15);c.fillText(r[1],398,y+22);
   });
   unclip(c);
 }
@@ -492,11 +497,12 @@ function renderMapSvg(){
 }
 
 const watch=document.getElementById('watch');
+let pullStartY=0, pullStartPull=0;
 watch.addEventListener('pointerdown',e=>{
   dragging=true;lastY=e.clientY;lastTs=performance.now();scrollV=0;
+  pullStartY=e.clientY;pullStartPull=shadePull;shadeDragging=false;
   if(screen==='stations'){
     longPress=setTimeout(()=>{
-      // hide first visible live-ish: hide PLAYING or tapped approx by Y
       const list=stations(); if(!list.length)return;
       const idx=ALL_STATIONS.indexOf(list[0]);
       hidden.add(idx);saveHidden();
@@ -510,19 +516,47 @@ watch.addEventListener('pointermove',e=>{
   if(longPress){clearTimeout(longPress);longPress=null}
   const dy=e.clientY-lastY, now=performance.now(), dt=Math.max(1,now-lastTs);
   const scale=466/watch.clientWidth;
+  const totalDy=(e.clientY-pullStartY)*scale;
   if(screen==='stations'){
     scrollY-=dy*scale;scrollV=-dy*scale/(dt/16);
     const {maxScroll}=listMetrics();scrollY=clamp(scrollY,0,maxScroll);
-  } else if(screen==='clock'||screen==='weather'||screen==='play'||screen==='slides'){
-    if(dy>18){ /* pull shade */ document.querySelector('[data-s=shade]').click(); dragging=false; }
+  } else if(screen==='shade'||screen==='clock'||screen==='weather'||screen==='play'||screen==='slides'){
+    // Interactive phone-like shade pull
+    if(screen!=='shade' && totalDy>12){
+      document.querySelector('[data-s=shade]').click();
+      shadePull=clamp(totalDy/340,0,1); shadeDragging=true;
+    } else if(screen==='shade'){
+      shadeDragging=true;
+      shadePull=clamp(pullStartPull+totalDy/340,0,1);
+    }
   }
   lastY=e.clientY;lastTs=now;
 });
-watch.addEventListener('pointerup',()=>{dragging=false;if(longPress){clearTimeout(longPress);longPress=null}});
-watch.addEventListener('pointercancel',()=>{dragging=false;if(longPress){clearTimeout(longPress);longPress=null}});
+watch.addEventListener('pointerup',()=>{
+  if(shadeDragging){
+    shadeTarget=shadePull>0.42?1:0;
+    if(shadeTarget<0.5 && screen==='shade'){ /* spring close stays on shade until settled */ }
+  }
+  dragging=false;shadeDragging=false;
+  if(longPress){clearTimeout(longPress);longPress=null}
+});
+watch.addEventListener('pointercancel',()=>{dragging=false;shadeDragging=false;if(longPress){clearTimeout(longPress);longPress=null}});
+
+// When opening shade via menu — spring to open
+document.querySelectorAll('.item').forEach(btn=>{
+  const prev=btn.onclick;
+  btn.addEventListener('click',()=>{
+    if(btn.dataset.s==='shade'){shadeTarget=1; if(shadePull<0.05) shadePull=0.08}
+    else {shadeTarget=0}
+  });
+});
 
 function frame(ts){
   const t=ts-t0;
+  if(!shadeDragging){
+    const d=shadeTarget-shadePull;
+    if(Math.abs(d)>0.004) shadePull+=d*0.22; else shadePull=shadeTarget;
+  }
   if(screen==='stations'&&!dragging){scrollY+=scrollV;scrollV*=.92;if(Math.abs(scrollV)<.05)scrollV=0;const {maxScroll}=listMetrics();scrollY=clamp(scrollY,0,maxScroll)}
   if(screen!=='all'&&screen!=='map') paint(screen,ctx,t);
   grid.querySelectorAll('canvas').forEach(cv=>paint(cv.dataset.s,cv.getContext('2d'),t));

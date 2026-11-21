@@ -85,50 +85,7 @@ static const co5300_lcd_init_cmd_t vendor_specific_init[] = {
     {0x29, NULL, 0, 0},
 };
 
-// 在waveshare_amoled_1_75类之前添加新的显示类
-class CustomLcdDisplay : public SpiLcdDisplay {
-public:
-    static void rounder_event_cb(lv_event_t* e) {
-        lv_area_t* area = (lv_area_t* )lv_event_get_param(e);
-        uint16_t x1 = area->x1;
-        uint16_t x2 = area->x2;
-
-        uint16_t y1 = area->y1;
-        uint16_t y2 = area->y2;
-
-        // round the start of coordinate down to the nearest 2M number
-        area->x1 = (x1 >> 1) << 1;
-        area->y1 = (y1 >> 1) << 1;
-        // round the end of coordinate up to the nearest 2N+1 number
-        area->x2 = ((x2 >> 1) << 1) + 1;
-        area->y2 = ((y2 >> 1) << 1) + 1;
-    }
-
-    CustomLcdDisplay(esp_lcd_panel_io_handle_t io_handle,
-                     esp_lcd_panel_handle_t panel_handle,
-                     int width,
-                     int height,
-                     int offset_x,
-                     int offset_y,
-                     bool mirror_x,
-                     bool mirror_y,
-                     bool swap_xy)
-        : SpiLcdDisplay(io_handle, panel_handle,
-                        width, height, offset_x, offset_y, mirror_x, mirror_y, swap_xy) {
-        // Note: UI customization should be done in SetupUI(), not in constructor
-        // to ensure lvgl objects are created before accessing them
-    }
-
-    virtual void SetupUI() override {
-        // Call parent SetupUI() first to create all lvgl objects
-        SpiLcdDisplay::SetupUI();
-
-        DisplayLockGuard lock(this);
-        lv_obj_set_style_pad_left(status_bar_, LV_HOR_RES*  0.1, 0);
-        lv_obj_set_style_pad_right(status_bar_, LV_HOR_RES*  0.1, 0);
-        lv_display_add_event_cb(display_, rounder_event_cb, LV_EVENT_INVALIDATE_AREA, NULL);
-    }
-};
+// Display UI: ValeraLcdDisplay (valera_face.*). Rounder is registered there.
 
 class CustomBacklight : public Backlight {
 public:

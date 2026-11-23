@@ -1441,7 +1441,7 @@ void ValeraLcdDisplay::PaintClock(const struct tm* tm, bool colon_on) {
     if (activation_label_) {
         if (activation_code_[0] != '\0' &&
             Application::GetInstance().GetDeviceState() == kDeviceStateActivating) {
-            char buf[48];
+            char buf[80];
             snprintf(buf, sizeof(buf), "Код: %s\nвведите на xiaozhi.me", activation_code_);
             lv_label_set_text(activation_label_, buf);
             lv_obj_clear_flag(activation_label_, LV_OBJ_FLAG_HIDDEN);

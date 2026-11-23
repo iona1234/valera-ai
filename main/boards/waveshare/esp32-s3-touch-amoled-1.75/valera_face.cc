@@ -7,6 +7,8 @@
 #include "device_state.h"
 #include "display/lvgl_display/lvgl_theme.h"
 #include "settings.h"
+#include "valera_radio_prefs.h"
+#include "valera_radio_stations.h"
 #include "valera_sensors.h"
 #include "wifi_board.h"
 
@@ -510,6 +512,8 @@ void ValeraLcdDisplay::BuildFace() {
 
     BuildShade();
     BuildSettings();
+    BuildRadio();
+    BuildStations();
 
     lv_obj_add_flag(root_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(root_, GestureEventCb, LV_EVENT_PRESSED, this);
@@ -521,8 +525,122 @@ void ValeraLcdDisplay::BuildFace() {
     SetGroupHidden(face_objs_, face_obj_n_, true);
     SetGroupHidden(reply_objs_, reply_obj_n_, true);
     SetGroupHidden(wifi_objs_, wifi_obj_n_, true);
+    SetGroupHidden(radio_objs_, radio_obj_n_, true);
+    SetGroupHidden(stations_objs_, stations_obj_n_, true);
     PickGazeTarget(act_eye_w_ * 0.18f, act_eye_h_ * 0.16f);
     next_blink_tick_ = 100 + (rand() % 120);
+}
+
+void ValeraLcdDisplay::BuildRadio() {
+    const lv_font_t* font = FaceFont(current_theme_);
+    const int min_side = LV_HOR_RES < LV_VER_RES ? LV_HOR_RES : LV_VER_RES;
+    const int text_w = (int)(min_side * 0.72f);
+
+    radio_title_ = lv_label_create(root_);
+    lv_label_set_text(radio_title_, "Радио");
+    lv_obj_set_style_text_color(radio_title_, kCyan, 0);
+    lv_obj_set_style_text_align(radio_title_, LV_TEXT_ALIGN_CENTER, 0);
+    if (font) lv_obj_set_style_text_font(radio_title_, font, 0);
+    lv_obj_align(radio_title_, LV_ALIGN_TOP_MID, 0, (int)(min_side * 0.12f));
+    Track(radio_objs_, &radio_obj_n_, 40, radio_title_);
+
+    radio_station_ = lv_label_create(root_);
+    lv_label_set_text(radio_station_, "—");
+    lv_obj_set_width(radio_station_, text_w);
+    lv_label_set_long_mode(radio_station_, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_color(radio_station_, kWhite, 0);
+    lv_obj_set_style_text_align(radio_station_, LV_TEXT_ALIGN_CENTER, 0);
+    if (font) lv_obj_set_style_text_font(radio_station_, font, 0);
+    lv_obj_align(radio_station_, LV_ALIGN_CENTER, 0, -50);
+    Track(radio_objs_, &radio_obj_n_, 40, radio_station_);
+
+    radio_meta_ = lv_label_create(root_);
+    lv_label_set_text(radio_meta_, "");
+    lv_obj_set_width(radio_meta_, text_w);
+    lv_label_set_long_mode(radio_meta_, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_color(radio_meta_, kEdge, 0);
+    lv_obj_set_style_text_align(radio_meta_, LV_TEXT_ALIGN_CENTER, 0);
+    if (font) lv_obj_set_style_text_font(radio_meta_, font, 0);
+    lv_obj_align(radio_meta_, LV_ALIGN_CENTER, 0, -10);
+    Track(radio_objs_, &radio_obj_n_, 40, radio_meta_);
+
+    radio_eq_cy_ = (int16_t)(min_side * 0.58f);
+    BuildSpectrum(radio_eq_, radio_objs_, &radio_obj_n_, 40, radio_eq_cy_, kMagenta);
+
+    radio_play_btn_ = MakeBtn(root_, (int)(min_side * 0.34f), 48);
+    lv_obj_align(radio_play_btn_, LV_ALIGN_CENTER, -(int)(min_side * 0.20f), (int)(min_side * 0.28f));
+    lv_obj_set_user_data(radio_play_btn_, (void*)(intptr_t)50);
+    lv_obj_add_event_cb(radio_play_btn_, RadioBtnEventCb, LV_EVENT_CLICKED, this);
+    lv_obj_t* pl = lv_label_create(radio_play_btn_);
+    lv_label_set_text(pl, "▶  Эфир");
+    lv_obj_set_style_text_color(pl, kWhite, 0);
+    if (font) lv_obj_set_style_text_font(pl, font, 0);
+    lv_obj_center(pl);
+    Track(radio_objs_, &radio_obj_n_, 40, radio_play_btn_);
+
+    radio_list_btn_ = MakeBtn(root_, (int)(min_side * 0.34f), 48);
+    lv_obj_align(radio_list_btn_, LV_ALIGN_CENTER, (int)(min_side * 0.20f), (int)(min_side * 0.28f));
+    lv_obj_set_user_data(radio_list_btn_, (void*)(intptr_t)51);
+    lv_obj_add_event_cb(radio_list_btn_, RadioBtnEventCb, LV_EVENT_CLICKED, this);
+    lv_obj_t* ll = lv_label_create(radio_list_btn_);
+    lv_label_set_text(ll, "Станции");
+    lv_obj_set_style_text_color(ll, kWhite, 0);
+    if (font) lv_obj_set_style_text_font(ll, font, 0);
+    lv_obj_center(ll);
+    Track(radio_objs_, &radio_obj_n_, 40, radio_list_btn_);
+}
+
+void ValeraLcdDisplay::BuildStations() {
+    const lv_font_t* font = FaceFont(current_theme_);
+    const int min_side = LV_HOR_RES < LV_VER_RES ? LV_HOR_RES : LV_VER_RES;
+    const int list_w = (int)(min_side * 0.82f);
+    const int list_h = (int)(min_side * 0.62f);
+    const int row_h = 56;
+
+    stations_title_ = lv_label_create(root_);
+    lv_label_set_text(stations_title_, "Станции RU");
+    lv_obj_set_style_text_color(stations_title_, kWhite, 0);
+    lv_obj_set_style_text_align(stations_title_, LV_TEXT_ALIGN_CENTER, 0);
+    if (font) lv_obj_set_style_text_font(stations_title_, font, 0);
+    lv_obj_align(stations_title_, LV_ALIGN_TOP_MID, 0, (int)(min_side * 0.10f));
+    Track(stations_objs_, &stations_obj_n_, 12, stations_title_);
+
+    stations_list_ = MakePlain(root_);
+    lv_obj_set_size(stations_list_, list_w, list_h);
+    lv_obj_align(stations_list_, LV_ALIGN_CENTER, 0, (int)(min_side * 0.06f));
+    lv_obj_add_flag(stations_list_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scroll_dir(stations_list_, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(stations_list_, LV_SCROLLBAR_MODE_OFF);
+    Track(stations_objs_, &stations_obj_n_, 12, stations_list_);
+
+    ValeraRadioPrefs::Load();
+    int row = 0;
+    for (int i = 0; i < kValeraRadioStationCount && row < kStationRowMax; ++i) {
+        if (ValeraRadioPrefs::IsHidden(i)) continue;
+        stations_rows_[row] = MakeBtn(stations_list_, list_w - 8, row_h);
+        lv_obj_set_pos(stations_rows_[row], 4, row * (row_h + 8));
+        lv_obj_set_style_bg_color(stations_rows_[row], lv_color_hex(kValeraRadioStations[i].color),
+                                  0);
+        lv_obj_set_style_bg_opa(stations_rows_[row], LV_OPA_40, 0);
+        lv_obj_set_user_data(stations_rows_[row], (void*)(intptr_t)i);
+        lv_obj_add_event_cb(stations_rows_[row], StationRowEventCb, LV_EVENT_CLICKED, this);
+
+        lv_obj_t* name = lv_label_create(stations_rows_[row]);
+        lv_label_set_text(name, kValeraRadioStations[i].name);
+        lv_obj_set_style_text_color(name, kWhite, 0);
+        if (font) lv_obj_set_style_text_font(name, font, 0);
+        lv_obj_align(name, LV_ALIGN_LEFT_MID, 16, -8);
+
+        lv_obj_t* meta = lv_label_create(stations_rows_[row]);
+        char mbuf[40];
+        snprintf(mbuf, sizeof(mbuf), "%s · %d kbps", kValeraRadioStations[i].genre,
+                 kValeraRadioStations[i].kbps);
+        lv_label_set_text(meta, mbuf);
+        lv_obj_set_style_text_color(meta, kEdge, 0);
+        if (font) lv_obj_set_style_text_font(meta, font, 0);
+        lv_obj_align(meta, LV_ALIGN_LEFT_MID, 16, 12);
+        ++row;
+    }
 }
 
 void ValeraLcdDisplay::BuildShade() {
@@ -609,8 +727,18 @@ void ValeraLcdDisplay::BuildShade() {
     if (font) lv_obj_set_style_text_font(sl, font, 0);
     lv_obj_center(sl);
 
+    shade_radio_btn_ = MakeBtn(shade_panel_, row_w, btn);
+    lv_obj_align(shade_radio_btn_, LV_ALIGN_TOP_MID, 0, 78 + 64 * 3);
+    lv_obj_set_user_data(shade_radio_btn_, (void*)(intptr_t)33);
+    lv_obj_add_event_cb(shade_radio_btn_, ShadeBtnEventCb, LV_EVENT_CLICKED, this);
+    lv_obj_t* rl = lv_label_create(shade_radio_btn_);
+    lv_label_set_text(rl, "Радио  ›");
+    lv_obj_set_style_text_color(rl, kCyan, 0);
+    if (font) lv_obj_set_style_text_font(rl, font, 0);
+    lv_obj_center(rl);
+
     shade_theme_btn_ = MakeBtn(shade_panel_, row_w, btn);
-    lv_obj_align(shade_theme_btn_, LV_ALIGN_TOP_MID, 0, 78 + 64 * 3);
+    lv_obj_align(shade_theme_btn_, LV_ALIGN_TOP_MID, 0, 78 + 64 * 4);
     lv_obj_set_user_data(shade_theme_btn_, (void*)(intptr_t)31);
     lv_obj_add_event_cb(shade_theme_btn_, ShadeBtnEventCb, LV_EVENT_CLICKED, this);
     lv_obj_t* tl = lv_label_create(shade_theme_btn_);
@@ -620,7 +748,7 @@ void ValeraLcdDisplay::BuildShade() {
     lv_obj_center(tl);
 
     shade_wifi_btn_ = MakeBtn(shade_panel_, row_w, btn);
-    lv_obj_align(shade_wifi_btn_, LV_ALIGN_TOP_MID, 0, 78 + 64 * 4);
+    lv_obj_align(shade_wifi_btn_, LV_ALIGN_TOP_MID, 0, 78 + 64 * 5);
     lv_obj_set_user_data(shade_wifi_btn_, (void*)(intptr_t)32);
     lv_obj_add_event_cb(shade_wifi_btn_, ShadeBtnEventCb, LV_EVENT_CLICKED, this);
     lv_obj_t* wl = lv_label_create(shade_wifi_btn_);
@@ -628,6 +756,10 @@ void ValeraLcdDisplay::BuildShade() {
     lv_obj_set_style_text_color(wl, kOrange, 0);
     if (font) lv_obj_set_style_text_font(wl, font, 0);
     lv_obj_center(wl);
+
+    // Taller shade so all rows fit.
+    shade_panel_h_ = (int)(LV_VER_RES * 0.88f);
+    lv_obj_set_height(shade_panel_, shade_panel_h_);
 
     SetShadePull(0.f);
 }
@@ -673,10 +805,20 @@ void ValeraLcdDisplay::BuildSettings() {
     if (font) lv_obj_set_style_text_font(settings_hint_, font, 0);
     lv_obj_set_width(settings_hint_, (int)(LV_HOR_RES * 0.70f));
     lv_label_set_long_mode(settings_hint_, LV_LABEL_LONG_WRAP);
-    lv_obj_align(settings_hint_, LV_ALIGN_CENTER, 0, 100);
+    lv_obj_align(settings_hint_, LV_ALIGN_CENTER, 0, 90);
+
+    settings_radio_btn_ = MakeBtn(settings_panel_, (int)(LV_HOR_RES * 0.55f), 52);
+    lv_obj_align(settings_radio_btn_, LV_ALIGN_CENTER, 0, (int)(LV_VER_RES * 0.22f));
+    lv_obj_set_user_data(settings_radio_btn_, (void*)(intptr_t)41);
+    lv_obj_add_event_cb(settings_radio_btn_, SettingsBtnEventCb, LV_EVENT_CLICKED, this);
+    lv_obj_t* rbl = lv_label_create(settings_radio_btn_);
+    lv_label_set_text(rbl, "Радио / Станции");
+    lv_obj_set_style_text_color(rbl, kCyan, 0);
+    if (font) lv_obj_set_style_text_font(rbl, font, 0);
+    lv_obj_center(rbl);
 
     settings_back_ = MakeBtn(settings_panel_, (int)(LV_HOR_RES * 0.50f), 52);
-    lv_obj_align(settings_back_, LV_ALIGN_BOTTOM_MID, 0, -(int)(LV_VER_RES * 0.12f));
+    lv_obj_align(settings_back_, LV_ALIGN_BOTTOM_MID, 0, -(int)(LV_VER_RES * 0.10f));
     lv_obj_set_user_data(settings_back_, (void*)(intptr_t)40);
     lv_obj_add_event_cb(settings_back_, SettingsBtnEventCb, LV_EVENT_CLICKED, this);
     lv_obj_t* bl = lv_label_create(settings_back_);
@@ -837,6 +979,9 @@ void ValeraLcdDisplay::OnShadeBtn(lv_event_t* e) {
             auto* wifi = static_cast<WifiBoard*>(&Board::GetInstance());
             wifi->EnterWifiConfigMode();
         });
+    } else if (id == 33) {
+        ShowShade(false);
+        OpenRadio();
     }
 }
 
@@ -847,8 +992,85 @@ void ValeraLcdDisplay::SettingsBtnEventCb(lv_event_t* e) {
 
 void ValeraLcdDisplay::OnSettingsBtn(lv_event_t* e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    lv_obj_t* t = (lv_obj_t*)lv_event_get_target(e);
+    const int id = (int)(intptr_t)lv_obj_get_user_data(t);
+    if (id == 41) {
+        ShowSettings(false);
+        OpenStations();
+        return;
+    }
     ShowSettings(false);
     ShowShade(true);
+}
+
+void ValeraLcdDisplay::RadioBtnEventCb(lv_event_t* e) {
+    auto* self = static_cast<ValeraLcdDisplay*>(lv_event_get_user_data(e));
+    if (self) self->OnRadioBtn(e);
+}
+
+void ValeraLcdDisplay::OnRadioBtn(lv_event_t* e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    lv_obj_t* t = (lv_obj_t*)lv_event_get_target(e);
+    const int id = (int)(intptr_t)lv_obj_get_user_data(t);
+    if (id == 50) {
+        radio_playing_ = !radio_playing_;
+        PaintRadio();
+    } else if (id == 51) {
+        OpenStations();
+    }
+}
+
+void ValeraLcdDisplay::StationRowEventCb(lv_event_t* e) {
+    auto* self = static_cast<ValeraLcdDisplay*>(lv_event_get_user_data(e));
+    if (self) self->OnStationRow(e);
+}
+
+void ValeraLcdDisplay::OnStationRow(lv_event_t* e) {
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    lv_obj_t* t = (lv_obj_t*)lv_event_get_target(e);
+    const int idx = (int)(intptr_t)lv_obj_get_user_data(t);
+    SelectStation(idx);
+}
+
+void ValeraLcdDisplay::OpenRadio() {
+    idle_step_ = 2;
+    ShowIdlePage(IdlePage::kRadio);
+}
+
+void ValeraLcdDisplay::OpenStations() {
+    idle_step_ = 3;
+    ShowIdlePage(IdlePage::kStations);
+}
+
+void ValeraLcdDisplay::SelectStation(int index) {
+    if (index < 0 || index >= kValeraRadioStationCount) return;
+    if (ValeraRadioPrefs::IsHidden(index)) return;
+    radio_station_idx_ = index;
+    radio_playing_ = true;
+    OpenRadio();
+    PaintRadio();
+}
+
+void ValeraLcdDisplay::PaintRadio() {
+    if (radio_station_idx_ < 0 || radio_station_idx_ >= kValeraRadioStationCount) {
+        radio_station_idx_ = 0;
+    }
+    const auto& st = kValeraRadioStations[radio_station_idx_];
+    if (radio_station_) lv_label_set_text(radio_station_, st.name);
+    if (radio_meta_) {
+        char buf[80];
+        if (radio_playing_) {
+            snprintf(buf, sizeof(buf), "%s · %d kbps\nэфир выбран (стрим — след. шаг)", st.genre,
+                     st.kbps);
+        } else {
+            snprintf(buf, sizeof(buf), "%s · %d kbps\nсвайп ← → · Станции", st.genre, st.kbps);
+        }
+        lv_label_set_text(radio_meta_, buf);
+    }
+    if (radio_play_btn_) {
+        lv_obj_t* lab = lv_obj_get_child(radio_play_btn_, 0);
+        if (lab) lv_label_set_text(lab, radio_playing_ ? "■  Стоп" : "▶  Эфир");
+    }
 }
 
 void ValeraLcdDisplay::GestureEventCb(lv_event_t* e) {
@@ -954,6 +1176,8 @@ void ValeraLcdDisplay::ShowIdlePage(IdlePage page) {
     idle_page_ticks_ = 0;
     SetGroupHidden(clock_objs_, clock_obj_n_, page != IdlePage::kClock);
     SetGroupHidden(weather_objs_, weather_obj_n_, page != IdlePage::kWeather);
+    SetGroupHidden(radio_objs_, radio_obj_n_, page != IdlePage::kRadio);
+    SetGroupHidden(stations_objs_, stations_obj_n_, page != IdlePage::kStations);
     if (page == IdlePage::kWeather) {
         last_out_temp_ = 9999;
         last_room_temp_ = 9999;
@@ -964,16 +1188,24 @@ void ValeraLcdDisplay::ShowIdlePage(IdlePage page) {
         last_hour_ = -1;
         last_min_ = -1;
     }
+    if (page == IdlePage::kRadio) PaintRadio();
+    if (page == IdlePage::kStations && stations_list_) {
+        lv_obj_scroll_to_y(stations_list_, 0, LV_ANIM_OFF);
+    }
 }
 
 void ValeraLcdDisplay::AdvanceIdlePage() {
-    idle_step_ = (idle_step_ + 1) % 2;
-    ShowIdlePage(idle_step_ == 0 ? IdlePage::kClock : IdlePage::kWeather);
+    static const IdlePage kSeq[] = {IdlePage::kClock, IdlePage::kWeather, IdlePage::kRadio,
+                                    IdlePage::kStations};
+    idle_step_ = (idle_step_ + 1) % 4;
+    ShowIdlePage(kSeq[idle_step_]);
 }
 
 void ValeraLcdDisplay::RetreatIdlePage() {
-    idle_step_ = (idle_step_ + 1) % 2;
-    ShowIdlePage(idle_step_ == 0 ? IdlePage::kClock : IdlePage::kWeather);
+    static const IdlePage kSeq[] = {IdlePage::kClock, IdlePage::kWeather, IdlePage::kRadio,
+                                    IdlePage::kStations};
+    idle_step_ = (idle_step_ + 3) % 4;
+    ShowIdlePage(kSeq[idle_step_]);
 }
 
 void ValeraLcdDisplay::LayoutForActive(bool active) {
@@ -984,6 +1216,8 @@ void ValeraLcdDisplay::LayoutForActive(bool active) {
         SetShadePull(0.f);
         SetGroupHidden(clock_objs_, clock_obj_n_, true);
         SetGroupHidden(weather_objs_, weather_obj_n_, true);
+        SetGroupHidden(radio_objs_, radio_obj_n_, true);
+        SetGroupHidden(stations_objs_, stations_obj_n_, true);
         SyncActiveStage();
     } else {
         SetGroupHidden(face_objs_, face_obj_n_, true);
@@ -1211,7 +1445,7 @@ void ValeraLcdDisplay::Tick() {
     if (idle_page_ == IdlePage::kClock) {
         time_t now = time(nullptr);
         ValeraClimate climate = ValeraSensors::Get();
-        if (climate.clock_fix_ok && !climate.time_ok) now += climate.clock_fix_sec;
+        if (climate.clock_fix_ok && !climate.time_ok) now += climate.clock_offset_sec;
         struct tm tm_info = {};
         localtime_r(&now, &tm_info);
         const bool blink = ((tick_ / 30) % 2) == 0;
@@ -1226,6 +1460,9 @@ void ValeraLcdDisplay::Tick() {
         }
     } else if (idle_page_ == IdlePage::kWeather) {
         if ((tick_ % 60) == 0) PaintWeather();
+    } else if (idle_page_ == IdlePage::kRadio) {
+        const float drive = radio_playing_ ? 0.95f : 0.25f;
+        AnimateSpectrum(radio_eq_, radio_eq_cy_, drive, 0.36f, kMagenta, kCyan);
     }
 }
 

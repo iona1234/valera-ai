@@ -123,9 +123,9 @@ private:
     bool pwr_long_fired_ = false;
 
     void InitializePowerSaveTimer() {
-        // Sleep dims the screen; do NOT auto PowerOff — that looked like a
-        // reboot every ~5 minutes (0:05 on the clock) while debugging on USB.
-        power_save_timer_ = new PowerSaveTimer(-1, 180, -1);
+        // Never auto-sleep / PowerOff on Valera — previous sleep/dim looked
+        // like a cyclic reboot while the watch sat on USB.
+        power_save_timer_ = new PowerSaveTimer(-1, -1, -1);
         power_save_timer_->OnEnterSleepMode([this]() {
             GetDisplay()->SetPowerSaveMode(true);
             GetBacklight()->SetBrightness(20);
@@ -134,7 +134,6 @@ private:
             GetDisplay()->SetPowerSaveMode(false);
             GetBacklight()->RestoreBrightness();
         });
-        // Start disabled; GetBatteryLevel enables only while discharging.
         power_save_timer_->SetEnabled(false);
     }
 
@@ -495,15 +494,10 @@ public:
     }
 
     virtual bool GetBatteryLevel(int &level, bool &charging, bool &discharging) override {
-        static bool last_discharging = false;
         charging = pmic_->IsCharging();
         discharging = pmic_->IsDischarging();
-        if (discharging != last_discharging)
-        {
-            power_save_timer_->SetEnabled(discharging);
-            last_discharging = discharging;
-        }
-
+        // Keep power-save permanently off (stability > idle dim on desk).
+        if (power_save_timer_) power_save_timer_->SetEnabled(false);
         level = pmic_->GetBatteryLevel();
         return true;
     }

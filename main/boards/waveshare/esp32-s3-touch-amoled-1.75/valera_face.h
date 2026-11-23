@@ -4,13 +4,10 @@
 
 #include <cstdint>
 
-// Round 466x466 Valera face.
-// Idle: Popka Stack clock <-> weather, occasional Sber-like play eyes.
-// Listen: cyan eyes + symmetric living mouth EQ (no text).
-// Think: violet eyes + softer mouth EQ.
-// Speak/reply: frameless text + coral living voice bars (different UI from listen).
-// Wi-Fi: hotspot provisioning instructions (XiaoZhi AP).
-// 16 ms LVGL timer; no DisplayLockGuard in Tick.
+// Valera round face (466×466) — HaloWatch-inspired, LVGL + XiaoZhi.
+// Idle: large HH:MM clock ↔ weather (swipe). No floating orbs / slideshow.
+// Shade: brightness ±, volume ±, open Settings (activation code lives there).
+// Listen/speak: eyes + EQ bars only.
 class ValeraLcdDisplay : public SpiLcdDisplay {
 public:
     ValeraLcdDisplay(esp_lcd_panel_io_handle_t io_handle, esp_lcd_panel_handle_t panel_handle,
@@ -29,8 +26,6 @@ public:
     void SetPowerSaveMode(bool on) override;
     void SetTheme(Theme* theme) override;
 
-    // Clock look: 0=Modern/Stack, 1=Neon, 2=Soft, 3=Retro, 4=Digital.
-    // Scale percent 80..160.
     void SetClockStyle(int look, int scale_pct, uint32_t hh_color, uint32_t mm_color);
     void LoadClockStyle();
     void OpenQuickShade() { ShowShade(true); }
@@ -39,9 +34,9 @@ public:
 
 private:
     enum class ActiveMode { kIdle, kListen, kSpeak, kThink, kWifi, kSleep };
-    enum class IdlePage { kClock, kWeather, kPlay, kSlides };
+    enum class IdlePage { kClock, kWeather };
 
-    static constexpr int kSpectrumN = 11;  // odd → perfect center bar, L↔R mirror
+    static constexpr int kSpectrumN = 11;
 
     struct Eye {
         lv_obj_t* body = nullptr;
@@ -51,7 +46,6 @@ private:
         int16_t home_cy = 0;
     };
 
-    // Declared before methods that take SegDigit*.
     struct SegDigit {
         lv_obj_t* seg[7] = {};
     };
@@ -75,7 +69,6 @@ private:
     void PaintClock(const struct tm* tm, bool colon_on);
     void PaintWeather();
     void PaintWifiHint();
-    void PaintSlides();
     void ApplyClockStyleVisual();
     void SetGroupHidden(lv_obj_t* const* objs, int n, bool hidden);
     void BuildSegDigit(SegDigit* d, int cx, int cy, int dw, int dh, int thick);
@@ -83,26 +76,30 @@ private:
     void ColorSegDigit(SegDigit* d, lv_color_t color);
 
     void BuildShade();
+    void BuildSettings();
     void ShowShade(bool open);
-    void SetShadePull(float pull);  // 0=closed … 1=open (finger / spring)
+    void ShowSettings(bool open);
+    void SetShadePull(float pull);
     void AnimateShadeTick();
     void RefreshShade();
+    void RefreshSettings();
     void CycleTheme();
-    void ApplyShadeRowAction(int row);
+    void NudgeBrightness(int delta);
+    void NudgeVolume(int delta);
     void AdvanceIdlePage();
     void RetreatIdlePage();
+
     static void GestureEventCb(lv_event_t* e);
-    static void ShadeRowEventCb(lv_event_t* e);
-    static void ShadePanelEventCb(lv_event_t* e);
+    static void ShadeBtnEventCb(lv_event_t* e);
+    static void SettingsBtnEventCb(lv_event_t* e);
     void OnGesture(lv_event_t* e);
-    void OnShadePanelGesture(lv_event_t* e);
+    void OnShadeBtn(lv_event_t* e);
+    void OnSettingsBtn(lv_event_t* e);
 
     void AnimateAmbient();
     void AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, int16_t pupil_r, bool playful);
-    void AnimatePlayFx();
-    void AnimateSpectrum(lv_obj_t* const* bars, float drive, float speed, lv_color_t c0,
+    void AnimateSpectrum(lv_obj_t* const* bars, int cy, float drive, float speed, lv_color_t c0,
                          lv_color_t c1);
-    void AnimateReplyFx();
     void PickGazeTarget(float max_x, float max_y);
     void PlacePupil(Eye* eye, int16_t w, int16_t h, int16_t pupil_r, float look_x, float look_y,
                     float open);
@@ -110,16 +107,12 @@ private:
     lv_obj_t* root_ = nullptr;
     lv_obj_t* bezel_ = nullptr;
 
-    // Popka-like Stack clock: sharp 7-segment digits (no bitmap zoom blur).
     SegDigit clock_hh_[2] = {};
     SegDigit clock_mm_[2] = {};
     lv_obj_t* clock_colon_[2] = {};
-    lv_obj_t* time_hh_label_ = nullptr;  // unused legacy (kept null)
-    lv_obj_t* time_mm_label_ = nullptr;
     lv_obj_t* clock_edge_weather_ = nullptr;
     lv_obj_t* clock_edge_date_ = nullptr;
     lv_obj_t* clock_wx_pill_ = nullptr;
-    lv_obj_t* activation_label_ = nullptr;
     lv_obj_t* shade_grab_ = nullptr;
     lv_obj_t* clock_objs_[48] = {};
     int clock_obj_n_ = 0;
@@ -133,7 +126,6 @@ private:
     int last_seg_mm_[2] = {-1, -1};
     bool boot_sound_played_ = false;
 
-    // Weather: large readable labels (Popka-like).
     lv_obj_t* weather_glyph_ = nullptr;
     lv_obj_t* weather_out_label_ = nullptr;
     lv_obj_t* weather_room_label_ = nullptr;
@@ -141,27 +133,6 @@ private:
     lv_obj_t* weather_objs_[16] = {};
     int weather_obj_n_ = 0;
 
-    // Procedural slideshow (0 flash image bytes).
-    lv_obj_t* slide_wash_ = nullptr;
-    lv_obj_t* slide_orb_[4] = {};
-    lv_obj_t* slide_label_ = nullptr;
-    lv_obj_t* slide_objs_[12] = {};
-    int slide_obj_n_ = 0;
-    int slide_index_ = 0;
-    int slide_ticks_ = 0;
-
-    Eye play_left_{};
-    Eye play_right_{};
-    lv_obj_t* play_orb_[10] = {};
-    lv_obj_t* play_ring_ = nullptr;
-    lv_obj_t* play_ring2_ = nullptr;
-    lv_obj_t* play_objs_[28] = {};
-    int play_obj_n_ = 0;
-    int16_t play_eye_w_ = 120;
-    int16_t play_eye_h_ = 74;
-    int16_t play_pupil_r_ = 20;
-
-    // Listen/think face: eyes + mouth spectrum.
     Eye act_left_{};
     Eye act_right_{};
     lv_obj_t* spectrum_[kSpectrumN] = {};
@@ -173,36 +144,46 @@ private:
     int16_t act_eye_cy_ = 180;
     int16_t spectrum_center_y_ = 320;
 
-    // Reply: text + coral voice EQ (same geometry as mouth, different color/role).
-    lv_obj_t* reply_orb_[6] = {};
     lv_obj_t* voice_eq_[kSpectrumN] = {};
     lv_obj_t* caption_label_ = nullptr;
     lv_obj_t* reply_objs_[40] = {};
     int reply_obj_n_ = 0;
     int16_t voice_eq_cy_ = 390;
 
-    // Wi-Fi hotspot screen.
     lv_obj_t* wifi_title_ = nullptr;
     lv_obj_t* wifi_ssid_ = nullptr;
     lv_obj_t* wifi_hint_ = nullptr;
     lv_obj_t* wifi_objs_[12] = {};
     int wifi_obj_n_ = 0;
 
-    // Phone-like shade (swipe-down sheet, ~60 fps spring).
-    lv_obj_t* shade_scrim_ = nullptr;
+    // Control Center shade (no circular clip — cheap + stable).
     lv_obj_t* shade_panel_ = nullptr;
     lv_obj_t* shade_handle_ = nullptr;
     lv_obj_t* shade_title_ = nullptr;
-    lv_obj_t* shade_row_btn_[6] = {};
-    lv_obj_t* shade_row_label_[6] = {};
-    lv_obj_t* shade_row_value_[6] = {};
-    lv_obj_t* shade_objs_[20] = {};
-    int shade_obj_n_ = 0;
+    lv_obj_t* shade_bri_minus_ = nullptr;
+    lv_obj_t* shade_bri_plus_ = nullptr;
+    lv_obj_t* shade_bri_val_ = nullptr;
+    lv_obj_t* shade_vol_minus_ = nullptr;
+    lv_obj_t* shade_vol_plus_ = nullptr;
+    lv_obj_t* shade_vol_val_ = nullptr;
+    lv_obj_t* shade_settings_btn_ = nullptr;
+    lv_obj_t* shade_theme_btn_ = nullptr;
+    lv_obj_t* shade_wifi_btn_ = nullptr;
     int shade_panel_h_ = 0;
-    float shade_pull_ = 0.f;     // visual 0..1
-    float shade_target_ = 0.f;   // spring target
+    float shade_pull_ = 0.f;
+    float shade_target_ = 0.f;
     bool shade_open_ = false;
     bool shade_dragging_ = false;
+    bool settings_open_ = false;
+
+    // Settings page: activation code + status.
+    lv_obj_t* settings_panel_ = nullptr;
+    lv_obj_t* settings_title_ = nullptr;
+    lv_obj_t* settings_code_ = nullptr;
+    lv_obj_t* settings_wifi_ = nullptr;
+    lv_obj_t* settings_hint_ = nullptr;
+    lv_obj_t* settings_back_ = nullptr;
+
     bool gesture_tracking_ = false;
     bool gesture_from_top_ = false;
     int16_t gesture_start_x_ = 0;
@@ -242,10 +223,4 @@ private:
     int blink_tick_ = 0;
     float blink_ = 0.f;
     float squint_ = 0.f;
-
-    // Idle pages only advance by swipe — no auto carousel (felt like reloads).
-    static constexpr int kClockTicks = 24 * 60 * 60;
-    static constexpr int kWeatherTicks = 24 * 60 * 60;
-    static constexpr int kPlayTicks = 24 * 60 * 60;
-    static constexpr int kSlidesTicks = 24 * 60 * 60;
 };

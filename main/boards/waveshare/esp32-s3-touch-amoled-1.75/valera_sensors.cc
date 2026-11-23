@@ -6,11 +6,15 @@
 #include <cJSON.h>
 #include <driver/i2c_master.h>
 #include <esp_log.h>
+#include <esp_sntp.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <sys/time.h>
+#include <wifi_manager.h>
 
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <mutex>
@@ -25,6 +29,49 @@ constexpr int kBarnaulLonE6 = 83763600;
 std::mutex g_mu;
 ValeraClimate g_climate;
 bool g_started = false;
+bool g_ntp_started = false;
+
+void EnsureTimezone() {
+    // POSIX TZ: "UTC-7" means local = UTC+7 (Barnaul / Asia/Barnaul, no DST).
+    setenv("TZ", "UTC-7", 1);
+    tzset();
+}
+
+bool SystemTimeLooksValid() {
+    time_t now = time(nullptr);
+    struct tm tm_info = {};
+    localtime_r(&now, &tm_info);
+    return (tm_info.tm_year + 1900) >= 2024;
+}
+
+void MarkTimeOk(bool ok) {
+    std::lock_guard<std::mutex> lock(g_mu);
+    g_climate.time_ok = ok;
+    if (ok) g_climate.clock_fix_ok = false;
+}
+
+void StartNtpIfNeeded() {
+    if (g_ntp_started) return;
+    if (!WifiManager::GetInstance().IsConnected()) return;
+    EnsureTimezone();
+    if (esp_sntp_enabled()) {
+        g_ntp_started = true;
+        return;
+    }
+    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, "pool.ntp.org");
+    esp_sntp_setservername(1, "time.google.com");
+    esp_sntp_init();
+    g_ntp_started = true;
+    ESP_LOGI(TAG, "SNTP started (TZ Asia/Barnaul = UTC+7)");
+}
+
+void PollNtpStatus() {
+    if (!g_ntp_started) return;
+    if (esp_sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED && SystemTimeLooksValid()) {
+        MarkTimeOk(true);
+    }
+}
 
 int RoundToInt(float v) {
     return (int)(v >= 0.f ? v + 0.5f : v - 0.5f);
@@ -178,11 +225,17 @@ bool g_bme_warned = false;
 #endif
 
 void ApplyClockFix(const char* iso_local) {
+    // Prefer SNTP. Open-Meteo local timestamp is only a fallback before NTP lands.
+    if (esp_sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED && SystemTimeLooksValid()) {
+        MarkTimeOk(true);
+        return;
+    }
     int year = 0, month = 0, day = 0, hour = 0, minute = 0;
     if (iso_local == nullptr ||
         std::sscanf(iso_local, "%d-%d-%dT%d:%d", &year, &month, &day, &hour, &minute) != 5) {
         return;
     }
+    EnsureTimezone();
     struct tm wall = {};
     wall.tm_year = year - 1900;
     wall.tm_mon = month - 1;
@@ -190,12 +243,15 @@ void ApplyClockFix(const char* iso_local) {
     wall.tm_hour = hour;
     wall.tm_min = minute;
     wall.tm_isdst = 0;
-    time_t labeled = timegm(&wall);
-    time_t now = time(nullptr);
-    if (labeled <= 0 || now <= 0) return;
-    std::lock_guard<std::mutex> lock(g_mu);
-    g_climate.clock_fix_sec = (int)(labeled - now);
-    g_climate.clock_fix_ok = true;
+    time_t local_epoch = mktime(&wall);
+    if (local_epoch <= 0) return;
+    struct timeval tv = {};
+    tv.tv_sec = local_epoch;
+    tv.tv_usec = 0;
+    settimeofday(&tv, nullptr);
+    MarkTimeOk(SystemTimeLooksValid());
+    ESP_LOGI(TAG, "Wall clock from Open-Meteo: %04d-%02d-%02d %02d:%02d", year, month, day, hour,
+             minute);
 }
 
 void FetchWeather() {
@@ -252,7 +308,8 @@ void FetchWeather() {
 }
 
 void SensorTask(void*) {
-    vTaskDelay(pdMS_TO_TICKS(5000));
+    EnsureTimezone();
+    vTaskDelay(pdMS_TO_TICKS(2000));
 #if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
     g_bme_open = g_bme.Open();
 #else
@@ -263,6 +320,8 @@ void SensorTask(void*) {
 #endif
     int weather_ticks = 90;
     for (;;) {
+        StartNtpIfNeeded();
+        PollNtpStatus();
 #if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
         if (g_bme_open) {
             float t = 0, rh = 0;
@@ -285,7 +344,7 @@ void SensorTask(void*) {
             weather_ticks = ok ? 0 : 80;
         }
         weather_ticks++;
-        vTaskDelay(pdMS_TO_TICKS(10000));
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
 
@@ -294,11 +353,18 @@ void SensorTask(void*) {
 void ValeraSensors::Start() {
     if (g_started) return;
     g_started = true;
+    EnsureTimezone();
     xTaskCreate(SensorTask, "valera_env", 12288, nullptr, 2, nullptr);
+}
+
+bool ValeraSensors::TimeSynced() {
+    std::lock_guard<std::mutex> lock(g_mu);
+    return g_climate.time_ok || SystemTimeLooksValid();
 }
 
 ValeraClimate ValeraSensors::Get() {
     std::lock_guard<std::mutex> lock(g_mu);
+    if (!g_climate.time_ok && SystemTimeLooksValid()) g_climate.time_ok = true;
     return g_climate;
 }
 

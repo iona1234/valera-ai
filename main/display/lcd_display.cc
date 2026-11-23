@@ -167,18 +167,37 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
 #if CONFIG_SOC_CPU_CORES_NUM > 1
     port_cfg.task_affinity = 1;
 #endif
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+    // Target ~60 fps without starving Wi-Fi/audio (prio 5 caused WDT reboot).
+    port_cfg.task_priority = 3;
+    port_cfg.timer_period_ms = 16;
+    port_cfg.task_max_sleep_ms = 16;
+    port_cfg.task_stack = 1024 * 10;
+#endif
     lvgl_port_init(&port_cfg);
 
     ESP_LOGI(TAG, "Adding LCD display");
     // SPI LCD still needs an internal DMA bounce buffer for PSRAM sources.
     // A full-frame transfer (~150KB) cannot allocate that bounce buffer, so
     // keep a small DMA strip in internal SRAM and partial refresh.
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+    // Dual PSRAM partial buffers — keep modest to avoid boot OOM reboot.
+    const uint32_t draw_buffer_pixels = static_cast<uint32_t>(width_ * 48);
+    const bool use_double_buffer = true;
+    const unsigned buff_dma = 0;
+    const unsigned buff_spiram = 1;
+#else
+    const uint32_t draw_buffer_pixels = static_cast<uint32_t>(width_ * 20);
+    const bool use_double_buffer = false;
+    const unsigned buff_dma = 1;
+    const unsigned buff_spiram = 0;
+#endif
     const lvgl_port_display_cfg_t display_cfg = {
         .io_handle = panel_io_,
         .panel_handle = panel_,
         .control_handle = nullptr,
-        .buffer_size = static_cast<uint32_t>(width_ * 20),
-        .double_buffer = false,
+        .buffer_size = draw_buffer_pixels,
+        .double_buffer = use_double_buffer,
         .trans_size = 0,
         .hres = static_cast<uint32_t>(width_),
         .vres = static_cast<uint32_t>(height_),
@@ -192,8 +211,8 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
         .color_format = LV_COLOR_FORMAT_RGB565,
         .flags =
             {
-                .buff_dma = 1,
-                .buff_spiram = 0,
+                .buff_dma = buff_dma,
+                .buff_spiram = buff_spiram,
                 .sw_rotate = 0,
                 .swap_bytes = 1,
                 .full_refresh = 0,

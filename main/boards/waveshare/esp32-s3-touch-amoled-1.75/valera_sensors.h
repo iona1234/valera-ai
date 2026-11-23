@@ -3,8 +3,8 @@
 #include <string>
 
 // Room probe is optional. Outdoor weather is Open-Meteo for Barnaul.
-// Clock fix compares that local timestamp with time() so a console
-// timezone already baked into settimeofday is not applied twice.
+// Wall clock: SNTP (UTC) + TZ Asia/Barnaul; Open-Meteo is a fallback
+// only when NTP has not synced yet.
 struct ValeraClimate {
     bool room_ok = false;
     float room_c = 0;
@@ -15,6 +15,7 @@ struct ValeraClimate {
     int weather_code = -1;
     int clock_fix_sec = 0;
     bool clock_fix_ok = false;
+    bool time_ok = false;
     char condition[24] = "погода";
 };
 
@@ -23,4 +24,6 @@ public:
     static void Start();
     static ValeraClimate Get();
     static std::string Describe();
+    // True after SNTP or Open-Meteo set a sane wall clock.
+    static bool TimeSynced();
 };

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>html,body{margin:0;background:#000;width:466px;height:466px;overflow:hidden}
+canvas{display:block}</style></head>
+<body><canvas id="c" width="466" height="466"></canvas>
+<script>
+const STATIONS = [
+  {name:"Наше Радио", genre:"rock", color:"#E2483D", kbps:128, song:"Сети — Смайл"},
+  {name:"Европа Плюс", genre:"hits", color:"#3E7BDB", kbps:128, song:"Европа Плюс — Non-Stop Hits"},
+  {name:"Европа Плюс Москва", genre:"hits", color:"#5FA8A0", kbps:128, song:"Москва — Top 40"},
+  {name:"Русское Радио", genre:"hits", color:"#C0392B", kbps:128, song:"Русские хиты — эфир"},
+  {name:"Maximum", genre:"rock", color:"#F2994A", kbps:96, song:"Maximum — Rock Chart"},
+  {name:"DFM", genre:"dance", color:"#9B5CFF", kbps:96, song:"DFM — Dance Floor"},
+  {name:"Hit FM", genre:"hits", color:"#FF6A13", kbps:96, song:"Hit FM — Fresh Hits"},
+  {name:"Radio Record", genre:"dance", color:"#E6007E", kbps:96, song:"Record Club — Gvozd"},
+  {name:"Record VIP House", genre:"dance", color:"#C9A0FF", kbps:96, song:"VIP House — Deep Set"},
+  {name:"Record Techno", genre:"dance", color:"#0E8C8A", kbps:96, song:"Techno — Peak Time"},
+  {name:"Record Mix", genre:"dance", color:"#7CC47F", kbps:96, song:"Record Mix — Live"},
+  {name:"Record Russian Hits", genre:"hits", color:"#FF8A65", kbps:96, song:"Russian Hits — Now"},
+  {name:"Record Trap", genre:"dance", color:"#8FB6FF", kbps:96, song:"Trap — Night Drive"},
+  {name:"Record House Hits", genre:"dance", color:"#F5C400", kbps:96, song:"House Hits — Weekend"},
+  {name:"Record Synthwave", genre:"dance", color:"#5B8DEF", kbps:96, song:"Synthwave — Neon"},
+  {name:"Record Club", genre:"dance", color:"#FF6B6B", kbps:96, song:"Club — Afterhours"},
+  {name:"Монте-Карло", genre:"lounge", color:"#D4AF37", kbps:96, song:"Monte Carlo — Soft"},
+  {name:"Ретро FM", genre:"hits", color:"#C45C26", kbps:256, song:"Ретро — Золотые 80-е"},
+  {name:"Дорожное радио", genre:"hits", color:"#2E86AB", kbps:128, song:"В дорогу — эфир"},
+  {name:"Шансон", genre:"chanson", color:"#8B4513", kbps:128, song:"Шансон — для души"},
+  {name:"Серебряный Дождь", genre:"talk", color:"#A0AEC0", kbps:128, song:"Разговорный эфир"},
+  {name:"Вести FM", genre:"news", color:"#2E6FE0", kbps:192, song:"Вести — выпуск"},
+  {name:"Маяк", genre:"news", color:"#F5C400", kbps:192, song:"Маяк — новости"},
+];
+const PLAYING_IDX = 0; // currently playing station (preview)
+const FOLDERS = [
+  {t:"Избранное", s: STATIONS.length+" станций", c:"#FF8BCB"},
+  {t:"Хиты", s:"Европа · Hit FM · Maximum", c:"#FF8A3D"},
+  {t:"Танцы", s:"Record · DFM · VIP", c:"#7CC47F"},
+  {t:"Новости", s:"Вести FM · Маяк", c:"#8FB6FF"},
+];
+const META = {
+  clock:{t:"Циферблат · Stack", d:"Огромные HH белые / MM coral, без двоеточия. Как у автора на YouTube."},
+  weather:{t:"Погода", d:"Крупная улица °C + дома °C + условие; мягкий pulse на глифе."},
+  play:{t:"Глаза idle · Sber", d:"Двойные кольца + орбы + взгляд — вайб платёжного терминала Сбера."},
+  shade:{t:"Быстрые настройки", d:"Свайп вниз: яркость, громкость, Wi‑Fi, Always On."},
+  listen:{t:"Слушает", d:"Глаза + симметричный cyan рот-EQ (11 столбиков, L↔R mirror), без текста."},
+  think:{t:"Думает", d:"Та же морда, спокойнее violet анимация."},
+  speak:{t:"Ответ", d:"Голосовой помощник: крупный текст + коралловый живой EQ (не cyan listen)."},
+  radio:{t:"Радио · Poster · Popka", d:"Симметричные лучи L↔R (23×2), ICY-название трека, edge Play/Stop."},
+  stations:{t:"Станции · now playing", d:"Карточки 410×104 + название текущей песни у играющей станции. Скролл Popka."},
+  volume:{t:"Громкость", d:"+/− вокруг динамика, дуга уровня."},
+  wifi:{t:"Wi‑Fi настройка", d:"Hotspot Xiaozhi-XXXX → браузер с формой сети. Первый boot без SSID входит сам."},
+  gallery:{t:"Галерея приложений", d:"Карточки приложений со скроллом как у Popka."},
+  all:{t:"Все окна", d:"Сетка скринов каждого экрана."},
+};
+
+const W=466,CX=233,CY=233;
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let screen='clock', t0=performance.now();
+let scrollY=0, scrollV=0, dragging=false, lastY=0, lastTs=0;
+let stationMode='list'; // folders | list
+
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function rr(ctx,x,y,w,h,r){const R=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+R,y);ctx.arcTo(x+w,y,x+w,y+h,R);ctx.arcTo(x+w,y+h,x,y+h,R);ctx.arcTo(x,y+h,x,y,R);ctx.arcTo(x,y,x+w,y,R);ctx.closePath()}
+function clear(c){c.fillStyle='#000';c.beginPath();c.arc(CX,CY,233,0,Math.PI*2);c.fill();c.save();c.beginPath();c.arc(CX,CY,233,0,Math.PI*2);c.clip()}
+function unclip(c){c.restore()}
+function curved(c,text,radius,a0,a1,color,size,weight){
+  c.save();c.fillStyle=color;c.font=`${weight||600} ${size}px Outfit,sans-serif`;
+  const chars=[...text]; let total=0; const widths=chars.map(ch=>{const w=c.measureText(ch).width;total+=w;return w});
+  const span=a1-a0, dir=span>=0?1:-1, abs=Math.abs(span);
+  const needed=total/radius, scale=abs>0.01?Math.min(1,abs/needed):1;
+  const use=total*scale; let angle=a0+(span-dir*(use/radius))/2;
+  for(let i=0;i<chars.length;i++){
+    const w=widths[i]*scale; const a=angle+dir*(w/radius)/2;
+    const x=CX+Math.cos(a)*radius, y=CY+Math.sin(a)*radius;
+    c.save();c.translate(x,y);c.rotate(a+Math.PI/2*dir);c.textAlign='center';c.textBaseline='middle';c.fillText(chars[i],0,0);c.restore();
+    angle+=dir*(w/radius);
+  }
+  c.restore();
+}
+
+function drawClock(c){
+  clear(c);
+  c.fillStyle='#fff';
+  for(let i=0;i<28;i++){const a=i*2.4,r=60+(i*37)%160;c.globalAlpha=.08+(i%5)*.03;c.beginPath();c.arc(CX+Math.cos(a)*r,CY+Math.sin(a)*r,1.1,0,Math.PI*2);c.fill()}
+  c.globalAlpha=1;
+  const now=new Date();
+  c.textAlign='center';c.textBaseline='middle';
+  c.font='800 168px Outfit,sans-serif';
+  c.fillStyle='#fff';c.fillText(String(now.getHours()).padStart(2,'0'),CX,CY-78);
+  c.fillStyle='#FF8FA3';c.fillText(String(now.getMinutes()).padStart(2,'0'),CX,CY+78);
+  curved(c,'ПТ 15 НОЯ  ·  BARNAUL',208,Math.PI*.55,Math.PI*1.45,'#E8EDF4',15,600);
+  curved(c,'−12° ОБЛАЧНО',208,-Math.PI*.35,Math.PI*.35,'#FF8FA3',15,700);
+  unclip(c);
+}
+function drawWeather(c){
+  clear(c);
+  const g=c.createRadialGradient(CX,CY-140,4,CX,CY-140,36);g.addColorStop(0,'#FFE08A');g.addColorStop(1,'#F5A524');
+  c.fillStyle=g;c.beginPath();c.arc(CX,CY-140,26,0,Math.PI*2);c.fill();
+  c.textAlign='center';c.textBaseline='middle';
+  c.font='800 110px Outfit,sans-serif';c.fillStyle='#00E8FF';c.fillText('−12°',CX,CY-8);
+  c.font='700 28px Outfit,sans-serif';c.fillStyle='#FF4DB8';c.fillText('дома 24°',CX,CY+70);
+  c.font='600 18px Outfit,sans-serif';c.fillStyle='#9AB4C8';c.fillText('ОБЛАЧНО',CX,CY+108);
+  unclip(c);
+}
+function drawEyes(c,t,playful,listening){
+  clear(c);
+  const ew=118,eh=72*(listening?.92:.88),pr=20;
+  const lookX=Math.sin(t*.0017)*18, lookY=Math.cos(t*.0013)*8, cy=listening?180:210;
+  function eye(ecx){
+    rr(c,ecx-ew/2,cy-eh/2,ew,eh,eh/2);c.fillStyle=playful?'#7CFFB2':'#E8EDF4';c.fill();
+    c.save();rr(c,ecx-ew/2,cy-eh/2,ew,eh,eh/2);c.clip();
+    c.fillStyle='#0A0C10';c.beginPath();c.arc(ecx+lookX,cy+lookY,pr,0,Math.PI*2);c.fill();
+    c.fillStyle='#fff';c.globalAlpha=.85;c.beginPath();c.arc(ecx+lookX-6,cy+lookY-6,4,0,Math.PI*2);c.fill();
+    c.globalAlpha=1;c.restore();
+  }
+  eye(CX-78);eye(CX+78);
+  if(listening){
+    // 11 bars, perfect L↔R mirror, cyan listen palette
+    const n=11, mid=5, barW=12, gap=7, total=n*barW+(n-1)*gap, ox=CX-total/2, cy=320;
+    for(let i=0;i<n;i++){
+      const m=i<=mid?i:(n-1-i);
+      const shape=.22+.78*Math.sin((m+.5)/(mid+1)*Math.PI/2);
+      const wave=.45+.55*Math.abs(Math.sin(t*.008+m*.7));
+      const env=Math.min(1,Math.max(.12,shape*(.35+.9*wave)));
+      const h=12+64*env;
+      c.fillStyle=m%2?'#7EEBFF':'#00E8FF';
+      rr(c,ox+i*(barW+gap),cy-h/2,barW,h,barW/2);c.fill();
+    }
+  } else if(playful){
+    c.strokeStyle='rgba(124,255,178,.25)';c.lineWidth=2;c.beginPath();c.arc(CX,CY,200,0,Math.PI*2);c.stroke();
+  }
+  unclip(c);
+}
+function drawSpeak(c,t){
+  clear(c);
+  for(let i=0;i<6;i++){
+    const a=t*.0007+i*1.05,R=195;
+    const x=CX+Math.cos(a)*R*(.78+.08*(i%2)), y=CY+Math.sin(a*.92)*R*(.78+.08*((i+1)%2));
+    c.globalAlpha=.12+.25*Math.abs(Math.sin(t*.002+i));
+    c.fillStyle=i%2?'#FF8FA3':'#FF4DB8';c.beginPath();c.arc(x,y,i%2?9:14,0,Math.PI*2);c.fill();
+  }
+  c.globalAlpha=1;c.fillStyle='#F4F7FB';c.textAlign='center';c.textBaseline='middle';c.font='600 28px Outfit,sans-serif';
+  ['Привет! Я Валера —','чем помочь?'].forEach((ln,i)=>c.fillText(ln,CX,CY-18+i*36));
+  // coral living voice EQ (same 11-bar mirror geometry as listen mouth, different color/role)
+  const n=11, mid=5, barW=12, gap=7, total=n*barW+(n-1)*gap, ox=CX-total/2, cy=390;
+  for(let i=0;i<n;i++){
+    const m=i<=mid?i:(n-1-i);
+    const shape=.22+.78*Math.sin((m+.5)/(mid+1)*Math.PI/2);
+    const wave=.45+.55*Math.abs(Math.sin(t*.01+m*.7));
+    const env=Math.min(1,Math.max(.12,shape*(.35+.95*wave)));
+    const h=10+50*env;
+    c.fillStyle=m%2?'#FF4DB8':'#FF8FA3';
+    rr(c,ox+i*(barW+gap),cy-h/2,barW,h,barW/2);c.fill();
+  }
+  unclip(c);
+}
+// Popka radio rays: 23 bands/side, low at +32°, high at −64°, left mirrors right (same levels).
+const RP_A_TOP=-64, RP_A_BOT=32, RP_R0=224, RP_LMAX=58, RD_BANDS=23;
+function rpAng(side,i){
+  const a=(RP_A_BOT+(RP_A_TOP-RP_A_BOT)*i/(RD_BANDS-1))*Math.PI/180;
+  return side ? Math.PI-a : a;
+}
+function rpBandLevel(i,t){
+  // shared L↔R envelope (Popka Goertzel stand-in): low bands calmer, mid peak
+  const shape=.22+.78*Math.sin((i+.5)/RD_BANDS*Math.PI);
+  const wave=.35+.65*Math.abs(Math.sin(t*.008+i*.38));
+  const kick=.15*Math.abs(Math.sin(t*.021+i*.11));
+  return Math.min(1, Math.max(.08, shape*wave+kick));
+}
+function rpRayColor(level){
+  if(level<.18) return '#3A3A40';
+  if(level<.45) return '#FFB98A';
+  if(level<.78) return '#FF8A3D';
+  return '#FFF1E4';
+}
+function drawRadioRays(c,t,playing){
+  for(let i=0;i<RD_BANDS;i++){
+    const level=playing?rpBandLevel(i,t):.08;
+    const len=level*RP_LMAX*1.15;
+    const col=rpRayColor(level);
+    const hw=2.6+1.4*level; // capsule half-width
+    for(let side=0;side<2;side++){
+      const ang=rpAng(side,i);
+      const x0=CX+Math.cos(ang)*RP_R0, y0=CY+Math.sin(ang)*RP_R0;
+      const x1=CX+Math.cos(ang)*(RP_R0-len), y1=CY+Math.sin(ang)*(RP_R0-len);
+      c.strokeStyle=col; c.lineWidth=hw*2; c.lineCap='round';
+      c.beginPath(); c.moveTo(x0,y0); c.lineTo(x1,y1); c.stroke();
+    }
+  }
+}
+function drawEdgePlay(c,label,playing){
+  // Popka HI_EDGE: bottom follows circle r≈227, height≈92
+  const R=227, h=92, y1=CY+Math.sqrt(Math.max(0,R*R-180*180))-4;
+  const y0=y1-h+28;
+  c.save();
+  c.beginPath(); c.arc(CX,CY,233,0,Math.PI*2); c.clip();
+  c.fillStyle='#FF8A3D';
+  rr(c,CX-150,y0,300,h,46); c.fill();
+  c.fillStyle='#2A1200'; c.font='800 26px Outfit,sans-serif';
+  c.textAlign='center'; c.textBaseline='middle';
+  c.fillText((playing?'■  ':'▶  ')+label, CX, y0+h*0.42);
+  c.restore();
+}
+function drawRadio(c,t){
+  clear(c);
+  const st=STATIONS[PLAYING_IDX];
+  const playing=true;
+  drawRadioRays(c,t,playing);
+  const now=new Date();
+  c.textAlign='center';c.textBaseline='middle';c.fillStyle='#FFF8EE';
+  c.font='700 22px Outfit,sans-serif';
+  c.fillText(`${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`,CX,30);
+  // Station name only (Popka: genre/tag lives in song line as ICY fallback)
+  c.font='800 36px Outfit,sans-serif'; c.fillText(st.name,CX,146);
+  // Now-playing marquee (ICY StreamTitle)
+  const song=(st.song&&st.song.length)?st.song:(st.genre+' · RU');
+  c.fillStyle='#9E9E9E'; c.font='500 16px Outfit,sans-serif';
+  c.save(); c.beginPath(); rr(c,CX-140,228,280,24,8); c.clip();
+  const gap=96, tw=c.measureText(song).width;
+  const period=Math.max(tw+gap, 280), hold=4000, speed=64/1000; // px/ms after hold
+  const phase=t% (hold + period/speed);
+  let ox=0;
+  if(phase>hold) ox=(phase-hold)*speed;
+  const base=CX-140+12 - ox;
+  c.textAlign='left'; c.textBaseline='middle';
+  c.fillText(song, base, 240);
+  c.fillText(song, base+period, 240);
+  c.restore();
+  // STATIONS | VOLUME — symmetric
+  c.fillStyle='#FF8A3D'; c.font='700 13px Outfit,sans-serif'; c.textAlign='center';
+  c.fillText('☰',CX-65,291); c.fillText('СТАНЦИИ',CX-65,316);
+  c.fillText('🔊',CX+65,291); c.fillText('ГРОМКОСТЬ',CX+65,316);
+  c.strokeStyle='#FFF8EE'; c.lineWidth=1; c.globalAlpha=.45;
+  c.beginPath(); c.moveTo(CX,278); c.lineTo(CX,328); c.stroke(); c.globalAlpha=1;
+  drawEdgePlay(c,'Стоп',true);
+  unclip(c);
+}
+function drawShade(c){
+  clear(c);c.globalAlpha=.25;c.textAlign='center';c.textBaseline='middle';
+  c.font='800 90px Outfit,sans-serif';c.fillStyle='#fff';c.fillText('15',CX,CY-40);c.fillStyle='#FF8FA3';c.fillText('22',CX,CY+50);c.globalAlpha=1;
+  rr(c,48,70,370,280,28);c.fillStyle='rgba(20,24,32,.92)';c.fill();
+  [['Яркость','▌▌▌▌▌░░'],['Громкость','▌▌▌▌░░░'],['Wi‑Fi','Valera-Home'],['Always On','15 с']].forEach((r,i)=>{
+    const y=110+i*55;c.textAlign='left';c.fillStyle='#9E9E9E';c.font='600 14px Outfit,sans-serif';c.fillText(r[0],78,y);
+    c.textAlign='right';c.fillStyle='#FFF8EE';c.font='600 16px Outfit,sans-serif';c.fillText(r[1],388,y);
+  });
+  unclip(c);
+}
+function drawVolume(c){
+  clear(c);c.textAlign='center';c.textBaseline='middle';c.fillStyle='#FFF8EE';
+  c.font='800 48px Outfit,sans-serif';c.fillText('+',CX,110);
+  c.font='700 28px Outfit,sans-serif';c.fillText('🔊',CX,CY);
+  c.font='600 18px Outfit,sans-serif';c.fillStyle='#9E9E9E';c.fillText('72%',CX,CY+40);
+  c.fillStyle='#FFF8EE';c.font='800 48px Outfit,sans-serif';c.fillText('−',CX,360);
+  c.strokeStyle='#FF8A3D';c.lineWidth=6;c.lineCap='round';c.beginPath();c.arc(CX,CY,160,-Math.PI*.75,Math.PI*.15);c.stroke();
+  unclip(c);
+}
+
+// Popka Halo list: cards 410×104, scale→0.6, alpha≈a² at circle edge
+const CARD_H=104, CARD_W=410, CARD_GAP=8, HEAD_H=64;
+function listMetrics(){
+  const items = stationMode==='folders'
+    ? FOLDERS.map(f=>({t:f.t,s:f.s,c:f.c,live:false,song:''}))
+    : STATIONS.map((s,i)=>({
+        t:s.name,
+        s: i===PLAYING_IDX ? ('♪ '+s.song) : (s.genre+' · '+s.kbps+' kbps'),
+        c:s.color, live:i===PLAYING_IDX, song:s.song||''
+      }));
+  const contentH = HEAD_H + items.length*(CARD_H+CARD_GAP) + 100;
+  const maxScroll = Math.max(0, contentH - 420);
+  return {items, contentH, maxScroll};
+}
+function easeS(x){ // (0.3,0,0.7,1)-ish
+  return x*x*(3-2*x);
+}
+function drawStations(c){
+  clear(c);
+  const {items, maxScroll} = listMetrics();
+  scrollY = clamp(scrollY, 0, maxScroll);
+  const titleK = clamp(1 - scrollY/80, 0, 1);
+  c.globalAlpha = titleK;
+  c.textAlign='center';c.textBaseline='middle';c.fillStyle='#FFF8EE';c.font='700 20px Outfit,sans-serif';
+  c.fillText(stationMode==='folders'?'Папки':'Станции RU', CX, 36 + scrollY*0.15);
+  c.globalAlpha=1;
+
+  let y = 70 - scrollY;
+  items.forEach((it,i)=>{
+    const mid = y + CARD_H/2;
+    const dist = Math.min(1, Math.abs(mid - CY) / 210);
+    const e = easeS(dist);
+    const aBg = clamp(0.5 + 0.5*(1-e), 0.25, 1); // Popka a_bg
+    const scale = clamp(1 - e*0.4, 0.6, 1);      // → 0.6 at edge
+    const alpha = aBg*aBg;                         // a_c = a_bg²
+    const w = CARD_W * scale, h = CARD_H * scale;
+    const x = CX - w/2;
+    const yy = mid - h/2;
+    if (yy < 450 && yy+h > 20) {
+      c.save(); c.globalAlpha = alpha;
+      rr(c,x,yy,w,h,22*scale); c.fillStyle='#2E3034'; c.fill();
+      // color disc + mini EQ when live
+      c.beginPath(); c.arc(x+40*scale, mid, 22*scale, 0, Math.PI*2); c.fillStyle=it.c; c.fill();
+      if(it.live){
+        c.fillStyle='#FFF8EE';
+        for(let b=0;b<3;b++){
+          const bh=6+10*Math.abs(Math.sin(performance.now()*.006+b));
+          rr(c,x+40*scale-10+b*7, mid-bh/2, 4, bh, 2); c.fill();
+        }
+      }
+      c.textAlign='left'; c.fillStyle='#FFF8EE';
+      c.font=`700 ${Math.round(20*scale)}px Outfit,sans-serif`;
+      c.fillText(it.t, x+74*scale, mid-(it.live?14:10)*scale);
+      c.fillStyle=it.live?'#FFB98A':'#9E9E9E';
+      c.font=`500 ${Math.round(13*scale)}px Outfit,sans-serif`;
+      const sub=it.s.length>34?it.s.slice(0,33)+'…':it.s;
+      c.fillText(sub, x+74*scale, mid+(it.live?12:14)*scale);
+      c.restore();
+    }
+    y += CARD_H + CARD_GAP;
+  });
+
+  // edge now-playing (station name)
+  drawEdgePlay(c, STATIONS[PLAYING_IDX].name, true);
+  unclip(c);
+}
+function drawGallery(c){
+  clear(c);
+  c.textAlign='center';c.textBaseline='middle';c.fillStyle='#FFF8EE';c.font='700 22px Outfit,sans-serif';c.fillText('Приложения',CX,40);
+  const apps=[['Погода','☁','#5EEAD4'],['Радио RU','📻','#FF8A3D'],['About','ℹ','#8FB6FF']];
+  apps.forEach((a,i)=>{
+    const y=80+i*100, scale=i===0?1:i===1?.96:.88, alpha=i===0?1:i===1?.85:.55;
+    c.save();c.globalAlpha=alpha;c.translate(CX,y+44);c.scale(scale,scale);c.translate(-CX,-(y+44));
+    rr(c,28,y,410,88,22);c.fillStyle='#2E3034';c.fill();
+    c.beginPath();c.arc(78,y+44,26,0,Math.PI*2);c.fillStyle=a[2];c.fill();
+    c.textAlign='left';c.fillStyle='#FFF8EE';c.font='700 22px Outfit,sans-serif';c.fillText(a[0],120,y+48);
+    c.restore();
+  });
+  unclip(c);
+}
+
+function drawWifi(c,t){
+  clear(c);
+  c.textAlign='center';c.textBaseline='middle';
+  c.fillStyle='#FF8A3D';c.font='800 28px Outfit,sans-serif';c.fillText('Wi-Fi',CX,70);
+  c.fillStyle='#FFF8EE';c.font='700 22px Outfit,sans-serif';c.fillText('Xiaozhi-A1B2',CX,CY-40);
+  c.fillStyle='#9AB4C8';c.font='500 15px Outfit,sans-serif';
+  c.fillText('1) Подключитесь к точке',CX,CY+20);
+  c.fillText('2) Браузер → http://192.168.4.1',CX,CY+48);
+  const pulse=.5+.5*Math.sin(t*.005);
+  c.strokeStyle=`rgba(255,138,61,${.35+.45*pulse})`;c.lineWidth=3;
+  c.beginPath();c.arc(CX,CY,200,0,Math.PI*2);c.stroke();
+  unclip(c);
+}
+function paint(name,c,t){
+  switch(name){
+    case 'clock': drawClock(c); break;
+    case 'weather': drawWeather(c); break;
+    case 'play': drawEyes(c,t,true,false); break;
+    case 'listen': drawEyes(c,t,false,true); break;
+    case 'think': drawEyes(c,t*.6,false,true); break;
+    case 'speak': drawSpeak(c,t); break;
+    case 'radio': drawRadio(c,t); break;
+    case 'stations': drawStations(c); break;
+    case 'volume': drawVolume(c); break;
+    case 'shade': drawShade(c); break;
+    case 'gallery': drawGallery(c); break;
+    case 'wifi': drawWifi(c,t); break;
+    default: drawClock(c);
+  }
+}
+
+
+const params=new URLSearchParams(location.search);
+const s=params.get('s')||'radio';
+const scrolled=params.get('scroll')==='1';
+if(s==='stations' && scrolled) scrollY=520;
+paint(s, document.getElementById('c').getContext('2d'), 2400);
+document.title='shot-ready';
+</script></body></html>

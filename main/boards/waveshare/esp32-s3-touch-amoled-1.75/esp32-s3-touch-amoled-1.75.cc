@@ -4,6 +4,7 @@
 
 #include "codecs/box_audio_codec.h"
 #include "application.h"
+#include "assets/lang_config.h"
 #include "button.h"
 #include "led/single_led.h"
 #include "mcp_server.h"
@@ -11,17 +12,26 @@
 #include "power_save_timer.h"
 #include "axp2101.h"
 #include "i2c_device.h"
+#include "valera_face.h"
+#include "valera_radio_prefs.h"
+#include "valera_radio_stations.h"
+#include "valera_sensors.h"
 
 #include <esp_log.h>
+#include <esp_system.h>
+#include <esp_timer.h>
 #include <esp_lcd_panel_vendor.h>
 #include <driver/i2c_master.h>
 #include <driver/spi_master.h>
 #include "esp_io_expander_tca9554.h"
 #include "settings.h"
 
+#include <ssid_manager.h>
+
 #include <esp_lcd_touch_cst9217.h>
 #include <esp_lvgl_port.h>
 #include <lvgl.h>
+#include <string>
 
 #define TAG "WaveshareEsp32s3TouchAMOLED1inch75"
 
@@ -77,50 +87,7 @@ static const co5300_lcd_init_cmd_t vendor_specific_init[] = {
     {0x29, NULL, 0, 0},
 };
 
-// 在waveshare_amoled_1_75类之前添加新的显示类
-class CustomLcdDisplay : public SpiLcdDisplay {
-public:
-    static void rounder_event_cb(lv_event_t* e) {
-        lv_area_t* area = (lv_area_t* )lv_event_get_param(e);
-        uint16_t x1 = area->x1;
-        uint16_t x2 = area->x2;
-
-        uint16_t y1 = area->y1;
-        uint16_t y2 = area->y2;
-
-        // round the start of coordinate down to the nearest 2M number
-        area->x1 = (x1 >> 1) << 1;
-        area->y1 = (y1 >> 1) << 1;
-        // round the end of coordinate up to the nearest 2N+1 number
-        area->x2 = ((x2 >> 1) << 1) + 1;
-        area->y2 = ((y2 >> 1) << 1) + 1;
-    }
-
-    CustomLcdDisplay(esp_lcd_panel_io_handle_t io_handle,
-                     esp_lcd_panel_handle_t panel_handle,
-                     int width,
-                     int height,
-                     int offset_x,
-                     int offset_y,
-                     bool mirror_x,
-                     bool mirror_y,
-                     bool swap_xy)
-        : SpiLcdDisplay(io_handle, panel_handle,
-                        width, height, offset_x, offset_y, mirror_x, mirror_y, swap_xy) {
-        // Note: UI customization should be done in SetupUI(), not in constructor
-        // to ensure lvgl objects are created before accessing them
-    }
-
-    virtual void SetupUI() override {
-        // Call parent SetupUI() first to create all lvgl objects
-        SpiLcdDisplay::SetupUI();
-
-        DisplayLockGuard lock(this);
-        lv_obj_set_style_pad_left(status_bar_, LV_HOR_RES*  0.1, 0);
-        lv_obj_set_style_pad_right(status_bar_, LV_HOR_RES*  0.1, 0);
-        lv_display_add_event_cb(display_, rounder_event_cb, LV_EVENT_INVALIDATE_AREA, NULL);
-    }
-};
+// Display UI: ValeraLcdDisplay (valera_face.*). Rounder is registered there.
 
 class CustomBacklight : public Backlight {
 public:
@@ -146,22 +113,28 @@ private:
     i2c_master_bus_handle_t i2c_bus_;
     Pmic* pmic_ = nullptr;
     Button boot_button_;
-    CustomLcdDisplay* display_;
+    ValeraLcdDisplay* display_;
     CustomBacklight* backlight_;
     esp_io_expander_handle_t io_expander = NULL;
     PowerSaveTimer* power_save_timer_;
+    esp_timer_handle_t pwr_poll_timer_ = nullptr;
+    bool pwr_pressed_ = false;
+    int64_t pwr_press_ms_ = 0;
+    bool pwr_long_fired_ = false;
 
     void InitializePowerSaveTimer() {
-        power_save_timer_ = new PowerSaveTimer(-1, 60, 300);
+        // Never auto-sleep / PowerOff on Valera — previous sleep/dim looked
+        // like a cyclic reboot while the watch sat on USB.
+        power_save_timer_ = new PowerSaveTimer(-1, -1, -1);
         power_save_timer_->OnEnterSleepMode([this]() {
             GetDisplay()->SetPowerSaveMode(true);
-            GetBacklight()->SetBrightness(20); });
+            GetBacklight()->SetBrightness(20);
+        });
         power_save_timer_->OnExitSleepMode([this]() {
             GetDisplay()->SetPowerSaveMode(false);
-            GetBacklight()->RestoreBrightness(); });
-        power_save_timer_->OnShutdownRequest([this](){ 
-            pmic_->PowerOff(); });
-        power_save_timer_->SetEnabled(true);
+            GetBacklight()->RestoreBrightness();
+        });
+        power_save_timer_->SetEnabled(false);
     }
 
     void InitializeCodecI2c() {
@@ -203,14 +176,115 @@ private:
         ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO));
     }
 
+    void BumpVolume(int delta) {
+        auto codec = GetAudioCodec();
+        if (codec == nullptr) return;
+        int volume = codec->output_volume() + delta;
+        if (volume > 100) volume = 20;  // wrap quiet→usable after max
+        if (volume < 0) volume = 0;
+        codec->SetOutputVolume(volume);
+        GetDisplay()->ShowNotification(std::string(Lang::Strings::VOLUME) + std::to_string(volume));
+    }
+
+    void HandlePwrShortPress() {
+        // Wake from sleep first; otherwise step volume.
+        if (power_save_timer_) power_save_timer_->WakeUp();
+        SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
+        BumpVolume(+10);
+    }
+
+    void HandlePwrLongPress() {
+        ESP_LOGI(TAG, "PWR long press: soft PowerOff via AXP2101");
+        if (display_) {
+            display_->ClearChatMessages();
+            display_->SetPowerSaveMode(true);
+        }
+        if (pmic_) pmic_->PowerOff();
+    }
+
+    static void PwrPollThunk(void* arg) {
+        static_cast<WaveshareEsp32s3TouchAMOLED1inch75*>(arg)->PollPwrButton();
+    }
+
+    void PollPwrButton() {
+        if (io_expander == nullptr) return;
+        uint32_t level = 0;
+        // SYS_OUT on EXIO4: high while PWR pressed (Waveshare HW reference).
+        if (esp_io_expander_get_level(io_expander, IO_EXPANDER_PIN_NUM_4, &level) != ESP_OK) return;
+        const bool down = level != 0;
+        const int64_t now_ms = esp_timer_get_time() / 1000;
+
+        if (down && !pwr_pressed_) {
+            pwr_pressed_ = true;
+            pwr_press_ms_ = now_ms;
+            pwr_long_fired_ = false;
+            return;
+        }
+        if (down && pwr_pressed_ && !pwr_long_fired_) {
+            if (now_ms - pwr_press_ms_ >= 1800) {
+                pwr_long_fired_ = true;
+                HandlePwrLongPress();
+            }
+            return;
+        }
+        if (!down && pwr_pressed_) {
+            const int64_t held = now_ms - pwr_press_ms_;
+            pwr_pressed_ = false;
+            if (!pwr_long_fired_ && held >= 40 && held < 1800) HandlePwrShortPress();
+            pwr_long_fired_ = false;
+        }
+    }
+
+    void InitializePwrButtonMonitor() {
+        if (io_expander == nullptr) return;
+        const esp_timer_create_args_t args = {
+            .callback = &PwrPollThunk,
+            .arg = this,
+            .dispatch_method = ESP_TIMER_TASK,
+            .name = "valera_pwr",
+            .skip_unhandled_events = true,
+        };
+        if (esp_timer_create(&args, &pwr_poll_timer_) == ESP_OK) {
+            esp_timer_start_periodic(pwr_poll_timer_, 50 * 1000);  // 50 ms
+            ESP_LOGI(TAG, "PWR button monitor on TCA9554 EXIO4");
+        }
+    }
+
+    void InitializeColdBootHygiene() {
+        const esp_reset_reason_t reason = esp_reset_reason();
+        ESP_LOGI(TAG, "Reset reason=%d (power-cycle clears RAM; NVS Wi-Fi kept)", (int)reason);
+        // Cold / brownout / USB re-plug: start with a clean UI session.
+        // Do NOT erase NVS — that would wipe Wi-Fi credentials every unplug.
+        if (reason == ESP_RST_POWERON || reason == ESP_RST_BROWNOUT) {
+            if (display_) {
+                display_->ClearChatMessages();
+                display_->SetPowerSaveMode(false);
+            }
+            if (power_save_timer_) power_save_timer_->WakeUp();
+        }
+    }
+
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
+            // Short BOOT during Starting used to always open the hotspot.
+            // On ESP32-S3 USB-Serial/JTAG, DTR/RTS often fakes a BOOT click and
+            // knocked a working station back into AP mode. Only enter hotspot if
+            // there is no saved SSID; otherwise treat as chat toggle after boot.
             if (app.GetDeviceState() == kDeviceStateStarting) {
-                EnterWifiConfigMode();
+                auto& ssids = SsidManager::GetInstance();
+                if (ssids.GetSsidList().empty()) {
+                    EnterWifiConfigMode();
+                }
                 return;
             }
+            if (power_save_timer_) power_save_timer_->WakeUp();
             app.ToggleChatState();
+        });
+
+        boot_button_.OnLongPress([this]() {
+            ESP_LOGI(TAG, "BOOT long press: Wi-Fi reconfigure");
+            EnterWifiConfigMode();
         });
 
 #if CONFIG_USE_DEVICE_AEC
@@ -220,6 +294,10 @@ private:
                 app.SetAecMode(app.GetAecMode() == kAecOff ? kAecOnDeviceSide : kAecOff);
             }
         });
+#endif
+
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+        InitializePwrButtonMonitor();
 #endif
     }
 
@@ -233,7 +311,8 @@ private:
         io_config.cs_gpio_num = EXAMPLE_PIN_NUM_LCD_CS;
         io_config.dc_gpio_num = GPIO_NUM_NC;
         io_config.spi_mode = 0;
-        io_config.pclk_hz = 40 * 1000 * 1000;
+        // 80 MHz QSPI helps keep partial LVGL flushes inside a 60 fps budget.
+        io_config.pclk_hz = 80 * 1000 * 1000;
         io_config.trans_queue_depth = 10;
         io_config.lcd_cmd_bits = 32;
         io_config.lcd_param_bits = 8;
@@ -261,13 +340,14 @@ private:
         esp_lcd_panel_invert_color(panel, false);
         esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
         esp_lcd_panel_disp_on_off(panel, true);
-        display_ = new CustomLcdDisplay(panel_io, panel,
+        display_ = new ValeraLcdDisplay(panel_io, panel,
                                         DISPLAY_WIDTH, DISPLAY_HEIGHT, DISPLAY_OFFSET_X, DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
         backlight_ = new CustomBacklight(panel_io);
         backlight_->RestoreBrightness();
     }
 
     void InitializeTouch() {
+        // CST9217 same as HaloWatch: raw axes are mirrored → x=466-x, y=466-y.
         esp_lcd_touch_handle_t tp;
         esp_lcd_touch_config_t tp_cfg = {
             .x_max = DISPLAY_WIDTH - 1,
@@ -308,10 +388,66 @@ private:
                 EnterWifiConfigMode();
                 return true;
             });
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+        mcp_server.AddTool(
+            "self.valera.climate",
+            "Текущая погода Барнаула (улица) и показания комнатного BME280, если он подключён.",
+            PropertyList(),
+            [](const PropertyList& properties) -> ReturnValue { return ValeraSensors::Describe(); });
+        mcp_server.AddTool(
+            "self.valera.clock_style",
+            "Тема/стиль часов Valera. look: 0=Modern, 1=Neon, 2=Soft, 3=Retro, 4=Digital; "
+            "scale_pct 80..160; hh_color/mm_color как 0xRRGGBB.",
+            PropertyList({Property("look", kPropertyTypeInteger, 0, 0, 4),
+                          Property("scale_pct", kPropertyTypeInteger, 100, 80, 160),
+                          Property("hh_color", kPropertyTypeInteger, 0xFFFFFF),
+                          Property("mm_color", kPropertyTypeInteger, 0xFF8FA3)}),
+            [this](const PropertyList& properties) -> ReturnValue {
+                auto* face = static_cast<ValeraLcdDisplay*>(display_);
+                face->SetClockStyle(properties["look"].value<int>(),
+                                    properties["scale_pct"].value<int>(),
+                                    (uint32_t)properties["hh_color"].value<int>(),
+                                    (uint32_t)properties["mm_color"].value<int>());
+                return true;
+            });
+        mcp_server.AddTool(
+            "self.valera.radio_stations",
+            "Видимые российские интернет-радиостанции Valera (скрытые через radio_hide не показаны).",
+            PropertyList(),
+            [](const PropertyList& properties) -> ReturnValue {
+                ValeraRadioPrefs::Load();
+                return ValeraRadioPrefs::ListVisible();
+            });
+        mcp_server.AddTool(
+            "self.valera.radio_hide",
+            "Скрыть станцию из списка (нерабочая/нежелательная). index — номер из radio_stations.",
+            PropertyList({Property("index", kPropertyTypeInteger, 0, 0, kValeraRadioStationCount - 1)}),
+            [](const PropertyList& properties) -> ReturnValue {
+                ValeraRadioPrefs::SetHidden(properties["index"].value<int>(), true);
+                return ValeraRadioPrefs::ListHidden();
+            });
+        mcp_server.AddTool(
+            "self.valera.radio_restore",
+            "Вернуть скрытую станцию. index — номер станции; без параметров — восстановить все.",
+            PropertyList({Property("index", kPropertyTypeInteger, -1, -1, kValeraRadioStationCount - 1)}),
+            [](const PropertyList& properties) -> ReturnValue {
+                const int idx = properties["index"].value<int>();
+                if (idx < 0) ValeraRadioPrefs::ClearHidden();
+                else ValeraRadioPrefs::SetHidden(idx, false);
+                return ValeraRadioPrefs::ListVisible();
+            });
+        mcp_server.AddTool(
+            "self.valera.radio_hidden",
+            "Список скрытых радиостанций Valera.",
+            PropertyList(),
+            [](const PropertyList& properties) -> ReturnValue {
+                return ValeraRadioPrefs::ListHidden();
+            });
+#endif
     }
 
 public:
-    WaveshareEsp32s3TouchAMOLED1inch75() : boot_button_(BOOT_BUTTON_GPIO) {
+    WaveshareEsp32s3TouchAMOLED1inch75() : boot_button_(BOOT_BUTTON_GPIO, false, 3000) {
         InitializePowerSaveTimer();
         InitializeCodecI2c();
 #if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
@@ -323,6 +459,13 @@ public:
         InitializeTouch();
         InitializeButtons();
         InitializeTools();
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+        // Home Wi-Fi baked in so the board joins without captive portal.
+        SsidManager::GetInstance().AddSsid("MyWiFi", "23456789");
+        ValeraRadioPrefs::Load();
+        ValeraSensors::Start();
+#endif
+        InitializeColdBootHygiene();
     }
 
     virtual AudioCodec* GetAudioCodec() override {
@@ -351,24 +494,23 @@ public:
     }
 
     virtual bool GetBatteryLevel(int &level, bool &charging, bool &discharging) override {
-        static bool last_discharging = false;
         charging = pmic_->IsCharging();
         discharging = pmic_->IsDischarging();
-        if (discharging != last_discharging)
-        {
-            power_save_timer_->SetEnabled(discharging);
-            last_discharging = discharging;
-        }
-
+        // Keep power-save permanently off (stability > idle dim on desk).
+        if (power_save_timer_) power_save_timer_->SetEnabled(false);
         level = pmic_->GetBatteryLevel();
         return true;
     }
 
     virtual void SetPowerSaveLevel(PowerSaveLevel level) override {
-        if (level != PowerSaveLevel::LOW_POWER) {
+        // Valera desk use: never enter Wi-Fi LOW_POWER — it looked like
+        // cyclic reconnect / reboot while navigating the face UI.
+        (void)level;
+        if (power_save_timer_) {
             power_save_timer_->WakeUp();
+            power_save_timer_->SetEnabled(false);
         }
-        WifiBoard::SetPowerSaveLevel(level);
+        WifiBoard::SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
     }
 };
 

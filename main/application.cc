@@ -338,6 +338,17 @@ void Application::HandleActivationDoneEvent() {
 
     has_server_time_ = ota_->HasServerTime();
 
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+    // Only clear the face code after a real OTA handshake (MQTT/WS config and
+    // no pending activation). Failed CheckVersion must keep the banner / retry.
+    if (ota_ && (ota_->HasMqttConfig() || ota_->HasWebsocketConfig()) &&
+        !ota_->HasActivationCode() && !ota_->HasActivationChallenge()) {
+        Settings act("valera", true);
+        act.SetInt("act_bound", 1);
+        act.EraseKey("act_code");
+    }
+#endif
+
     // Protocol start may have already raised MAIN_EVENT_ERROR. Do not replace
     // that alert with the "ready" UI/sound — the main loop can process both
     // events back-to-back because the activation task is lower priority.
@@ -459,6 +470,11 @@ void Application::CheckNewVersion() {
             retry_count++;
             if (retry_count >= MAX_RETRY) {
                 ESP_LOGE(TAG, "Too many retries, exit version check");
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+                // Surface the failure on the round face (stock status bar is hidden).
+                display->SetChatMessage(
+                    "system", "Нет связи с xiaozhi.me — код не пришёл. Проверьте интернет.");
+#endif
                 return;
             }
 
@@ -496,10 +512,17 @@ void Application::CheckNewVersion() {
         retry_delay = 10;  // Reset retry delay
 
         if (ota_->HasNewVersion()) {
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+            // Valera is a custom image. Accepting the cloud "new firmware"
+            // would overwrite it and look like a white-flash reboot loop.
+            ESP_LOGW(TAG, "Skipping cloud firmware upgrade (Valera custom build %s → %s)",
+                     BOARD_NAME, ota_->GetFirmwareVersion().c_str());
+#else
             if (UpgradeFirmware(ota_->GetFirmwareUrl(), ota_->GetFirmwareVersion())) {
                 return;  // This line will never be reached after reboot
             }
             // If upgrade failed, continue to normal operation
+#endif
         }
 
         // No new version, mark the current version as valid
@@ -742,8 +765,24 @@ void Application::ShowActivationCode(const std::string& code, const std::string&
          digit_sound{'6', Lang::Sounds::OGG_6}, digit_sound{'7', Lang::Sounds::OGG_7},
          digit_sound{'8', Lang::Sounds::OGG_8}, digit_sound{'9', Lang::Sounds::OGG_9}}};
 
+    // Ensure the digit code is in the on-screen message (some locales omit it).
+    std::string shown = message;
+    if (!code.empty() && shown.find(code) == std::string::npos) {
+        if (!shown.empty()) shown += " ";
+        shown += code;
+    }
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+    // Valera face: persist code then force a digit-only system line the face
+    // always parses, even if locale strings are weird.
+    if (!code.empty()) {
+        Settings act("valera", true);
+        act.SetString("act_code", code);
+        act.SetInt("act_bound", 0);
+        shown = std::string("CODE ") + code;
+    }
+#endif
     // This sentence uses 9KB of SRAM, so we need to wait for it to finish
-    Alert(Lang::Strings::ACTIVATION, message.c_str(), "link", Lang::Sounds::OGG_ACTIVATION);
+    Alert(Lang::Strings::ACTIVATION, shown.c_str(), "link", Lang::Sounds::OGG_ACTIVATION);
 
     for (const auto& digit : code) {
         auto it = std::find_if(digit_sounds.begin(), digit_sounds.end(),

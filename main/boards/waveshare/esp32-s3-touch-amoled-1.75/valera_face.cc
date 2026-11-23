@@ -9,6 +9,7 @@
 #include "valera_sensors.h"
 #include "wifi_board.h"
 
+#include <ssid_manager.h>
 #include <wifi_manager.h>
 
 #include <cmath>
@@ -898,17 +899,38 @@ void ValeraLcdDisplay::ApplyCaption() {
 
 void ValeraLcdDisplay::PaintWifiHint() {
     auto& wifi = WifiManager::GetInstance();
-    char ssid[64];
+    char line[96];
+    char hint[220];
+
     if (wifi.IsConfigMode()) {
-        snprintf(ssid, sizeof(ssid), "%s", wifi.GetApSsid().c_str());
-        if (wifi_ssid_) lv_label_set_text(wifi_ssid_, ssid);
-        char hint[192];
-        snprintf(hint, sizeof(hint), "1) Wi-Fi → %s\n2) Браузер → %s", ssid,
-                 wifi.GetApWebUrl().c_str());
+        if (wifi_title_) lv_label_set_text(wifi_title_, "Настройка Wi‑Fi");
+        snprintf(line, sizeof(line), "%s", wifi.GetApSsid().c_str());
+        if (wifi_ssid_) lv_label_set_text(wifi_ssid_, line);
+        snprintf(hint, sizeof(hint),
+                 "1) Телефон → Wi‑Fi → %s\n"
+                 "2) Браузер → %s\n"
+                 "Только сеть 2.4 ГГц",
+                 line, wifi.GetApWebUrl().c_str());
         if (wifi_hint_) lv_label_set_text(wifi_hint_, hint);
-    } else if (caption_text_[0]) {
-        if (wifi_ssid_) lv_label_set_text(wifi_ssid_, caption_text_);
+        return;
     }
+
+    // Station connect in progress (saved SSID, not hotspot).
+    if (wifi_title_) lv_label_set_text(wifi_title_, "Подключение…");
+    std::string try_ssid = wifi.GetSsid();
+    if (try_ssid.empty()) {
+        auto list = SsidManager::GetInstance().GetSsidList();
+        if (!list.empty()) try_ssid = list[0].ssid;
+    }
+    if (try_ssid.empty()) try_ssid = "Wi‑Fi";
+    if (try_ssid.size() > 28) try_ssid = try_ssid.substr(0, 27) + "…";
+    if (wifi_ssid_) lv_label_set_text(wifi_ssid_, try_ssid.c_str());
+    snprintf(hint, sizeof(hint),
+             "Ищу сеть 2.4 ГГц…\n"
+             "Если снова hotspot —\n"
+             "проверьте пароль\n"
+             "и диапазон роутера");
+    if (wifi_hint_) lv_label_set_text(wifi_hint_, hint);
 }
 
 void ValeraLcdDisplay::PickGazeTarget(float max_x, float max_y) {
@@ -952,9 +974,13 @@ void ValeraLcdDisplay::Tick() {
         case kDeviceStateIdle:
             want = ActiveMode::kIdle;
             break;
-        case kDeviceStateConnecting:
         case kDeviceStateStarting:
+            // Boot splash / version — keep idle face, not the hotspot screen.
+            want = ActiveMode::kIdle;
+            break;
+        case kDeviceStateConnecting:
         case kDeviceStateWifiConfiguring:
+            // Connecting = trying saved SSID; WifiConfiguring = hotspot AP.
             want = ActiveMode::kWifi;
             break;
         default:

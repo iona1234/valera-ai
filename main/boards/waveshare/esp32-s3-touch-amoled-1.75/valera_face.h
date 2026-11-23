@@ -51,6 +51,11 @@ private:
         int16_t home_cy = 0;
     };
 
+    // Declared before methods that take SegDigit*.
+    struct SegDigit {
+        lv_obj_t* seg[7] = {};
+    };
+
     static void TickThunk(lv_timer_t* timer);
     void Tick();
     void BuildFace();
@@ -103,9 +108,6 @@ private:
     lv_obj_t* bezel_ = nullptr;
 
     // Popka-like Stack clock: sharp 7-segment digits (no bitmap zoom blur).
-    struct SegDigit {
-        lv_obj_t* seg[7] = {};
-    };
     SegDigit clock_hh_[2] = {};
     SegDigit clock_mm_[2] = {};
     lv_obj_t* clock_colon_[2] = {};

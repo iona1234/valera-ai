@@ -34,10 +34,10 @@ pip install esptool
 
 ## 3. Прошить COM4
 
-Положите `merged-binary.bin` например в `D:\valera\`:
+Положите `merged-binary.bin` например в `E:\valera\`:
 
 ```powershell
-cd D:\valera
+cd E:\valera
 python -m esptool --chip esp32s3 -p COM4 -b 460800 write_flash 0x0 merged-binary.bin
 ```
 

@@ -1,6 +1,7 @@
 #include "valera_face.h"
 
 #include "application.h"
+#include "assets/lang_config.h"
 #include "audio/audio_codec.h"
 #include "board.h"
 #include "device_state.h"
@@ -125,6 +126,12 @@ void ValeraLcdDisplay::SetupUI() {
     BuildFace();
     face_ready_ = true;
     timer_ = lv_timer_create(TickThunk, 16, this);
+    if (!boot_sound_played_) {
+        boot_sound_played_ = true;
+        Application::GetInstance().Schedule([]() {
+            Application::GetInstance().PlaySound(Lang::Sounds::OGG_SUCCESS);
+        });
+    }
 }
 
 void ValeraLcdDisplay::HideStockChrome() {
@@ -220,35 +227,76 @@ void ValeraLcdDisplay::SetClockStyle(int look, int scale_pct, uint32_t hh_color,
     ApplyClockStyleVisual();
 }
 
-void ValeraLcdDisplay::ApplyClockStyleVisual() {
-    if (!time_hh_label_ || !time_mm_label_) return;
-    // Native font size only — LVGL transform_scale on bitmap fonts looks blurry
-    // (was ~5.5× zoom). Spacing nudges size without resampling glyphs.
-    const int gap = (int)(28 * (clock_scale_pct_ / 100.f));
-    lv_obj_set_style_transform_scale_x(time_hh_label_, LV_SCALE_NONE, 0);
-    lv_obj_set_style_transform_scale_y(time_hh_label_, LV_SCALE_NONE, 0);
-    lv_obj_set_style_transform_scale_x(time_mm_label_, LV_SCALE_NONE, 0);
-    lv_obj_set_style_transform_scale_y(time_mm_label_, LV_SCALE_NONE, 0);
-    lv_obj_align(time_hh_label_, LV_ALIGN_CENTER, 0, -gap);
-    lv_obj_align(time_mm_label_, LV_ALIGN_CENTER, 0, gap);
+void ValeraLcdDisplay::ColorSegDigit(SegDigit* d, lv_color_t color) {
+    if (!d) return;
+    for (int i = 0; i < 7; ++i) {
+        if (d->seg[i]) lv_obj_set_style_bg_color(d->seg[i], color, 0);
+    }
+}
 
+void ValeraLcdDisplay::BuildSegDigit(SegDigit* d, int cx, int cy, int dw, int dh, int thick) {
+    if (!d) return;
+    auto bar = [&](int x, int y, int w, int h) -> lv_obj_t* {
+        lv_obj_t* o = MakePlain(root_);
+        lv_obj_set_size(o, w, h);
+        lv_obj_set_pos(o, x, y);
+        lv_obj_set_style_radius(o, thick / 2, 0);
+        lv_obj_set_style_bg_color(o, kWhite, 0);
+        lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
+        Track(clock_objs_, &clock_obj_n_, 48, o);
+        return o;
+    };
+    const int x0 = cx - dw / 2;
+    const int y0 = cy - dh / 2;
+    const int mid = y0 + dh / 2 - thick / 2;
+    // a b c d e f g  (classic 7-seg)
+    d->seg[0] = bar(x0 + thick, y0, dw - 2 * thick, thick);                         // a
+    d->seg[1] = bar(x0 + dw - thick, y0 + thick, thick, dh / 2 - thick);             // b
+    d->seg[2] = bar(x0 + dw - thick, mid + thick, thick, dh / 2 - thick);            // c
+    d->seg[3] = bar(x0 + thick, y0 + dh - thick, dw - 2 * thick, thick);             // d
+    d->seg[4] = bar(x0, mid + thick, thick, dh / 2 - thick);                         // e
+    d->seg[5] = bar(x0, y0 + thick, thick, dh / 2 - thick);                          // f
+    d->seg[6] = bar(x0 + thick, mid, dw - 2 * thick, thick);                         // g
+}
+
+void ValeraLcdDisplay::SetSegDigit(SegDigit* d, int value, lv_color_t color) {
+    if (!d) return;
+    static const uint8_t kMask[10] = {
+        0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F,
+    };
+    if (value < 0 || value > 9) value = 0;
+    const uint8_t m = kMask[value];
+    for (int i = 0; i < 7; ++i) {
+        if (!d->seg[i]) continue;
+        const bool on = (m >> i) & 1;
+        lv_obj_set_style_bg_color(d->seg[i], color, 0);
+        lv_obj_set_style_bg_opa(d->seg[i], on ? LV_OPA_COVER : LV_OPA_20, 0);
+    }
+}
+
+void ValeraLcdDisplay::ApplyClockStyleVisual() {
     lv_color_t hh = lv_color_hex(clock_hh_color_);
     lv_color_t mm = lv_color_hex(clock_mm_color_);
-    if (clock_look_ == 1) {  // Neon
+    if (clock_look_ == 1) {
         hh = kCyan;
         mm = kMagenta;
-    } else if (clock_look_ == 2) {  // Soft
+    } else if (clock_look_ == 2) {
         hh = lv_color_hex(0xFFE8EE);
         mm = kCoral;
-    } else if (clock_look_ == 3) {  // Retro
+    } else if (clock_look_ == 3) {
         hh = lv_color_hex(0xF5C400);
         mm = lv_color_hex(0xC45C26);
-    } else if (clock_look_ == 4) {  // Digital
+    } else if (clock_look_ == 4) {
         hh = lv_color_hex(0x7CFFB2);
         mm = lv_color_hex(0x5EEAD4);
     }
-    lv_obj_set_style_text_color(time_hh_label_, hh, 0);
-    lv_obj_set_style_text_color(time_mm_label_, mm, 0);
+    ColorSegDigit(&clock_hh_[0], hh);
+    ColorSegDigit(&clock_hh_[1], hh);
+    ColorSegDigit(&clock_mm_[0], mm);
+    ColorSegDigit(&clock_mm_[1], mm);
+    for (int i = 0; i < 2; ++i) {
+        if (clock_colon_[i]) lv_obj_set_style_bg_color(clock_colon_[i], mm, 0);
+    }
 }
 
 void ValeraLcdDisplay::BuildFace() {
@@ -301,20 +349,31 @@ void ValeraLcdDisplay::BuildFace() {
         },
         LV_EVENT_CLICKED, this);
 
-    auto make_stack = [&](lv_color_t color) -> lv_obj_t* {
-        lv_obj_t* lab = lv_label_create(root_);
-        lv_label_set_text(lab, "00");
-        lv_obj_set_style_text_color(lab, color, 0);
-        lv_obj_set_style_text_align(lab, LV_TEXT_ALIGN_CENTER, 0);
-        if (edge_font) lv_obj_set_style_text_font(lab, edge_font, 0);
-        lv_obj_set_style_transform_pivot_x(lab, lv_pct(50), 0);
-        lv_obj_set_style_transform_pivot_y(lab, lv_pct(50), 0);
-        return lab;
-    };
-    time_hh_label_ = make_stack(kWhite);
-    time_mm_label_ = make_stack(kCoral);
-    Track(clock_objs_, &clock_obj_n_, 16, time_hh_label_);
-    Track(clock_objs_, &clock_obj_n_, 16, time_mm_label_);
+    // Large sharp Stack clock (Popka SC_STACK / SC_LCD idea): 7-seg, ~110px tall.
+    const int dig_w = (int)(min_side * 0.16f);
+    const int dig_h = (int)(min_side * 0.24f);
+    const int dig_t = (int)(min_side * 0.028f);
+    const int gap_x = (int)(min_side * 0.04f);
+    const int row_gap = (int)(min_side * 0.06f);
+    const int hh_cy = cy - dig_h / 2 - row_gap / 2;
+    const int mm_cy = cy + dig_h / 2 + row_gap / 2;
+    BuildSegDigit(&clock_hh_[0], cx - dig_w / 2 - gap_x / 2, hh_cy, dig_w, dig_h, dig_t);
+    BuildSegDigit(&clock_hh_[1], cx + dig_w / 2 + gap_x / 2, hh_cy, dig_w, dig_h, dig_t);
+    BuildSegDigit(&clock_mm_[0], cx - dig_w / 2 - gap_x / 2, mm_cy, dig_w, dig_h, dig_t);
+    BuildSegDigit(&clock_mm_[1], cx + dig_w / 2 + gap_x / 2, mm_cy, dig_w, dig_h, dig_t);
+    for (int i = 0; i < 2; ++i) {
+        clock_colon_[i] = MakePlain(root_);
+        lv_obj_set_size(clock_colon_[i], dig_t, dig_t);
+        lv_obj_set_style_radius(clock_colon_[i], dig_t / 2, 0);
+        lv_obj_set_style_bg_color(clock_colon_[i], kCoral, 0);
+        lv_obj_set_style_bg_opa(clock_colon_[i], LV_OPA_COVER, 0);
+        lv_obj_set_pos(clock_colon_[i], cx - dig_t / 2, cy - dig_t * 2 + i * dig_t * 3);
+        Track(clock_objs_, &clock_obj_n_, 48, clock_colon_[i]);
+    }
+    SetSegDigit(&clock_hh_[0], 0, kWhite);
+    SetSegDigit(&clock_hh_[1], 0, kWhite);
+    SetSegDigit(&clock_mm_[0], 0, kCoral);
+    SetSegDigit(&clock_mm_[1], 0, kCoral);
     ApplyClockStyleVisual();
 
     clock_edge_weather_ = lv_label_create(root_);
@@ -323,17 +382,27 @@ void ValeraLcdDisplay::BuildFace() {
     lv_obj_set_style_text_align(clock_edge_weather_, LV_TEXT_ALIGN_CENTER, 0);
     if (edge_font) lv_obj_set_style_text_font(clock_edge_weather_, edge_font, 0);
     lv_obj_align(clock_edge_weather_, LV_ALIGN_TOP_MID, 0, (int)(min_side * 0.10f));
-    Track(clock_objs_, &clock_obj_n_, 16, clock_edge_weather_);
+    Track(clock_objs_, &clock_obj_n_, 48, clock_edge_weather_);
 
     clock_edge_date_ = lv_label_create(root_);
-    lv_label_set_text(clock_edge_date_, "синхронизация…");
+    lv_label_set_text(clock_edge_date_, "");
     lv_obj_set_style_text_color(clock_edge_date_, kEdge, 0);
     lv_obj_set_style_text_align(clock_edge_date_, LV_TEXT_ALIGN_CENTER, 0);
     if (edge_font) lv_obj_set_style_text_font(clock_edge_date_, edge_font, 0);
     lv_obj_set_width(clock_edge_date_, (int)(min_side * 0.78f));
     lv_label_set_long_mode(clock_edge_date_, LV_LABEL_LONG_WRAP);
     lv_obj_align(clock_edge_date_, LV_ALIGN_BOTTOM_MID, 0, -(int)(min_side * 0.06f));
-    Track(clock_objs_, &clock_obj_n_, 16, clock_edge_date_);
+    Track(clock_objs_, &clock_obj_n_, 48, clock_edge_date_);
+
+    activation_label_ = lv_label_create(root_);
+    lv_label_set_text(activation_label_, "");
+    lv_obj_set_style_text_color(activation_label_, kCyan, 0);
+    lv_obj_set_style_text_align(activation_label_, LV_TEXT_ALIGN_CENTER, 0);
+    if (edge_font) lv_obj_set_style_text_font(activation_label_, edge_font, 0);
+    lv_obj_set_width(activation_label_, (int)(min_side * 0.85f));
+    lv_label_set_long_mode(activation_label_, LV_LABEL_LONG_WRAP);
+    lv_obj_align(activation_label_, LV_ALIGN_CENTER, 0, (int)(min_side * 0.32f));
+    lv_obj_add_flag(activation_label_, LV_OBJ_FLAG_HIDDEN);
 
     // Weather — large labels
     weather_glyph_ = MakePlain(root_);
@@ -573,9 +642,8 @@ void ValeraLcdDisplay::BuildShade() {
     lv_obj_set_style_bg_color(shade_panel_, lv_color_hex(0x121820), 0);
     lv_obj_set_style_bg_opa(shade_panel_, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(shade_panel_, 0, 0);
-    lv_obj_set_style_shadow_width(shade_panel_, 28, 0);
-    lv_obj_set_style_shadow_opa(shade_panel_, LV_OPA_40, 0);
-    lv_obj_set_style_shadow_color(shade_panel_, lv_color_hex(0x000000), 0);
+    // No LVGL shadow — soft shadows kill FPS on partial QSPI refresh.
+    lv_obj_set_style_shadow_width(shade_panel_, 0, 0);
     lv_obj_add_flag(shade_panel_, LV_OBJ_FLAG_CLICKABLE);
     // Gestures only on root_ — avoid double handlers on panel.
     Track(shade_objs_, &shade_obj_n_, 20, shade_panel_);
@@ -1039,7 +1107,8 @@ void ValeraLcdDisplay::Tick() {
     if (want != active_mode_) SetActiveMode(want);
 
     AnimateShadeTick();
-    AnimateAmbient();
+    // While the shade is open/dragging, skip ambient work — keeps ~60 fps on QSPI.
+    if (shade_pull_ < 0.05f && !shade_dragging_) AnimateAmbient();
 
     if (assistant_active_) {
         if (InWifiStage()) {
@@ -1069,6 +1138,8 @@ void ValeraLcdDisplay::Tick() {
     else if (idle_page_ == IdlePage::kSlides) limit = kSlidesTicks;
     if (idle_page_ticks_ >= limit) AdvanceIdlePage();
 
+    if (shade_pull_ > 0.05f || shade_dragging_) return;
+
     if (idle_page_ == IdlePage::kClock) {
         time_t now = time(nullptr);
         ValeraClimate climate = ValeraSensors::Get();
@@ -1076,10 +1147,11 @@ void ValeraLcdDisplay::Tick() {
         if (climate.clock_fix_ok && !climate.time_ok) now += climate.clock_fix_sec;
         struct tm tm_info = {};
         localtime_r(&now, &tm_info);
+        const bool blink = ((tick_ / 30) % 2) == 0;
         if (tm_info.tm_hour != last_hour_ || tm_info.tm_min != last_min_ ||
             tm_info.tm_wday != last_wday_ || tm_info.tm_mday != last_mday_ ||
-            (tick_ % 120) == 0) {
-            PaintClock(&tm_info, false);
+            (tick_ % 30) == 0) {
+            PaintClock(&tm_info, blink);
             last_hour_ = tm_info.tm_hour;
             last_min_ = tm_info.tm_min;
             last_wday_ = tm_info.tm_wday;
@@ -1263,25 +1335,18 @@ void ValeraLcdDisplay::AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, 
 }
 
 void ValeraLcdDisplay::AnimatePlayFx() {
-    const float cx = LV_HOR_RES * 0.5f;
-    const float cy = LV_VER_RES * 0.5f;
-    const float R = LV_HOR_RES * 0.36f;
+    // Rings only — particles used to fly over the eyes.
     const float breath = 0.5f + 0.5f * sinf(tick_ * 0.03f);
-    lv_obj_set_style_border_opa(play_ring_, (lv_opa_t)(14 + (int)(36 * breath)), 0);
-    lv_obj_set_style_border_color(play_ring_, ((tick_ / 45) % 2) ? kCyanDim : kMagentaDim, 0);
-    lv_obj_set_style_border_opa(play_ring2_, (lv_opa_t)(10 + (int)(30 * (1.f - breath))), 0);
-    lv_obj_set_style_border_color(play_ring2_, ((tick_ / 45) % 2) ? kMagentaDim : kCyanDim, 0);
-
+    if (play_ring_) {
+        lv_obj_set_style_border_opa(play_ring_, (lv_opa_t)(14 + (int)(36 * breath)), 0);
+        lv_obj_set_style_border_color(play_ring_, ((tick_ / 45) % 2) ? kCyanDim : kMagentaDim, 0);
+    }
+    if (play_ring2_) {
+        lv_obj_set_style_border_opa(play_ring2_, (lv_opa_t)(10 + (int)(30 * (1.f - breath))), 0);
+        lv_obj_set_style_border_color(play_ring2_, ((tick_ / 45) % 2) ? kMagentaDim : kCyanDim, 0);
+    }
     for (int i = 0; i < 10; ++i) {
-        const float a = tick_ * (0.016f + i * 0.0018f) + i * 0.75f;
-        const float rx = R * (0.50f + 0.40f * ((i % 3) / 2.f));
-        const float ry = R * (0.38f + 0.32f * (((i + 1) % 3) / 2.f));
-        const int x = (int)(cx + rx * cosf(a));
-        const int y = (int)(cy + ry * sinf(a * 0.88f + 0.35f));
-        const int sz = (i % 3 == 0) ? 18 : ((i % 2) ? 10 : 14);
-        lv_obj_set_pos(play_orb_[i], x - sz / 2, y - sz / 2);
-        const float tw = 0.30f + 0.70f * fabsf(sinf(tick_ * 0.045f + i));
-        lv_obj_set_style_bg_opa(play_orb_[i], (lv_opa_t)(28 + (int)(150 * tw)), 0);
+        if (play_orb_[i]) lv_obj_add_flag(play_orb_[i], LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -1324,14 +1389,30 @@ void ValeraLcdDisplay::AnimateReplyFx() {
 }
 
 void ValeraLcdDisplay::PaintClock(const struct tm* tm, bool colon_on) {
-    (void)colon_on;
     if (tm == nullptr) return;
-    char hh[4];
-    char mm[4];
-    snprintf(hh, sizeof(hh), "%02d", tm->tm_hour);
-    snprintf(mm, sizeof(mm), "%02d", tm->tm_min);
-    if (time_hh_label_) lv_label_set_text(time_hh_label_, hh);
-    if (time_mm_label_) lv_label_set_text(time_mm_label_, mm);
+    lv_color_t hh_c = lv_color_hex(clock_hh_color_);
+    lv_color_t mm_c = lv_color_hex(clock_mm_color_);
+    if (clock_look_ == 1) {
+        hh_c = kCyan;
+        mm_c = kMagenta;
+    } else if (clock_look_ == 2) {
+        hh_c = lv_color_hex(0xFFE8EE);
+        mm_c = kCoral;
+    } else if (clock_look_ == 3) {
+        hh_c = lv_color_hex(0xF5C400);
+        mm_c = lv_color_hex(0xC45C26);
+    } else if (clock_look_ == 4) {
+        hh_c = lv_color_hex(0x7CFFB2);
+        mm_c = lv_color_hex(0x5EEAD4);
+    }
+    SetSegDigit(&clock_hh_[0], tm->tm_hour / 10, hh_c);
+    SetSegDigit(&clock_hh_[1], tm->tm_hour % 10, hh_c);
+    SetSegDigit(&clock_mm_[0], tm->tm_min / 10, mm_c);
+    SetSegDigit(&clock_mm_[1], tm->tm_min % 10, mm_c);
+    const lv_opa_t colon_opa = colon_on ? LV_OPA_COVER : LV_OPA_40;
+    for (int i = 0; i < 2; ++i) {
+        if (clock_colon_[i]) lv_obj_set_style_bg_opa(clock_colon_[i], colon_opa, 0);
+    }
 
     ValeraClimate c = ValeraSensors::Get();
     if (clock_edge_weather_) {
@@ -1348,12 +1429,24 @@ void ValeraLcdDisplay::PaintClock(const struct tm* tm, bool colon_on) {
     if (clock_edge_date_) {
         const bool time_ok = c.time_ok || (tm->tm_year + 1900) >= 2024;
         if (!time_ok) {
-            lv_label_set_text(clock_edge_date_, "время с интернета…");
+            lv_label_set_text(clock_edge_date_, "");
         } else {
             char date_line[72];
             snprintf(date_line, sizeof(date_line), "%s, %d %s", WeekdayFull(tm->tm_wday),
                      tm->tm_mday, MonthFull(tm->tm_mon));
             lv_label_set_text(clock_edge_date_, date_line);
+        }
+    }
+
+    if (activation_label_) {
+        if (activation_code_[0] != '\0' &&
+            Application::GetInstance().GetDeviceState() == kDeviceStateActivating) {
+            char buf[48];
+            snprintf(buf, sizeof(buf), "Код: %s\nвведите на xiaozhi.me", activation_code_);
+            lv_label_set_text(activation_label_, buf);
+            lv_obj_clear_flag(activation_label_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(activation_label_, LV_OBJ_FLAG_HIDDEN);
         }
     }
 }
@@ -1400,7 +1493,9 @@ void ValeraLcdDisplay::SetStatus(const char* status) {
 }
 
 void ValeraLcdDisplay::ShowNotification(const char* notification, int duration_ms) {
-    LvglDisplay::ShowNotification(notification, duration_ms);
+    // Stock toast sits on the hidden status bar — skip to avoid chrome flicker.
+    (void)notification;
+    (void)duration_ms;
 }
 
 void ValeraLcdDisplay::ShowNotification(const std::string& notification, int duration_ms) {
@@ -1416,9 +1511,31 @@ void ValeraLcdDisplay::SetEmotion(const char* emotion) {
 
 void ValeraLcdDisplay::SetChatMessage(const char* role, const char* content) {
     DisplayLockGuard lock(this);
-    if (!face_ready_ || caption_label_ == nullptr) return;
+    if (!face_ready_) return;
 
     const char* text = (content != nullptr) ? content : "";
+    // Pull activation digits out of the system alert so they stay on the clock face.
+    if (role != nullptr && std::strcmp(role, "system") == 0 && text[0] != '\0') {
+        char digits[16] = {};
+        int n = 0;
+        for (const char* p = text; *p && n < 15; ++p) {
+            if (*p >= '0' && *p <= '9') {
+                digits[n++] = *p;
+            } else if (n >= 4) {
+                break;
+            } else {
+                n = 0;
+            }
+        }
+        digits[n] = '\0';
+        if (n >= 4 && n <= 8) {
+            std::strncpy(activation_code_, digits, sizeof(activation_code_) - 1);
+            activation_code_[sizeof(activation_code_) - 1] = '\0';
+            last_hour_ = -1;  // force PaintClock to refresh activation banner
+        }
+    }
+
+    if (caption_label_ == nullptr) return;
     std::strncpy(caption_text_, text, sizeof(caption_text_) - 1);
     caption_text_[sizeof(caption_text_) - 1] = '\0';
 

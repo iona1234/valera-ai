@@ -460,6 +460,8 @@ public:
         InitializeButtons();
         InitializeTools();
 #if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+        // Home Wi-Fi baked in so the board joins without captive portal.
+        SsidManager::GetInstance().AddSsid("MyWiFi", "23456789");
         ValeraRadioPrefs::Load();
         ValeraSensors::Start();
 #endif

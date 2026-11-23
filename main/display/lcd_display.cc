@@ -182,9 +182,9 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     // A full-frame transfer (~150KB) cannot allocate that bounce buffer, so
     // keep a small DMA strip in internal SRAM and partial refresh.
 #if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
-    // Dual PSRAM draw buffers + partial refresh. DMA flag off: OCT PSRAM is
-    // not a reliable DMA source; the LCD IO driver copies from PSRAM.
-    const uint32_t draw_buffer_pixels = static_cast<uint32_t>(width_ * 48);
+    // Dual PSRAM draw buffers + partial refresh. Taller strips = fewer flush
+    // rounds per dirty frame (Popka-style smoothness on 466² AMOLED).
+    const uint32_t draw_buffer_pixels = static_cast<uint32_t>(width_ * 80);
     const bool use_double_buffer = true;
     const unsigned buff_dma = 0;
     const unsigned buff_spiram = 1;

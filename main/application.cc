@@ -496,10 +496,17 @@ void Application::CheckNewVersion() {
         retry_delay = 10;  // Reset retry delay
 
         if (ota_->HasNewVersion()) {
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+            // Valera is a custom image. Accepting the cloud "new firmware"
+            // would overwrite it and look like a white-flash reboot loop.
+            ESP_LOGW(TAG, "Skipping cloud firmware upgrade (Valera custom build %s → %s)",
+                     BOARD_NAME, ota_->GetFirmwareVersion().c_str());
+#else
             if (UpgradeFirmware(ota_->GetFirmwareUrl(), ota_->GetFirmwareVersion())) {
                 return;  // This line will never be reached after reboot
             }
             // If upgrade failed, continue to normal operation
+#endif
         }
 
         // No new version, mark the current version as valid
@@ -742,8 +749,14 @@ void Application::ShowActivationCode(const std::string& code, const std::string&
          digit_sound{'6', Lang::Sounds::OGG_6}, digit_sound{'7', Lang::Sounds::OGG_7},
          digit_sound{'8', Lang::Sounds::OGG_8}, digit_sound{'9', Lang::Sounds::OGG_9}}};
 
+    // Ensure the digit code is in the on-screen message (some locales omit it).
+    std::string shown = message;
+    if (!code.empty() && shown.find(code) == std::string::npos) {
+        if (!shown.empty()) shown += " ";
+        shown += code;
+    }
     // This sentence uses 9KB of SRAM, so we need to wait for it to finish
-    Alert(Lang::Strings::ACTIVATION, message.c_str(), "link", Lang::Sounds::OGG_ACTIVATION);
+    Alert(Lang::Strings::ACTIVATION, shown.c_str(), "link", Lang::Sounds::OGG_ACTIVATION);
 
     for (const auto& digit : code) {
         auto it = std::find_if(digit_sounds.begin(), digit_sounds.end(),

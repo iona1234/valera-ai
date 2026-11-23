@@ -73,6 +73,9 @@ private:
     void PaintSlides();
     void ApplyClockStyleVisual();
     void SetGroupHidden(lv_obj_t* const* objs, int n, bool hidden);
+    void BuildSegDigit(SegDigit* d, int cx, int cy, int dw, int dh, int thick);
+    void SetSegDigit(SegDigit* d, int value, lv_color_t color);
+    void ColorSegDigit(SegDigit* d, lv_color_t color);
 
     void BuildShade();
     void ShowShade(bool open);
@@ -99,18 +102,27 @@ private:
     lv_obj_t* root_ = nullptr;
     lv_obj_t* bezel_ = nullptr;
 
-    // Stack clock (native font size — no LVGL zoom blur).
-    lv_obj_t* time_hh_label_ = nullptr;
+    // Popka-like Stack clock: sharp 7-segment digits (no bitmap zoom blur).
+    struct SegDigit {
+        lv_obj_t* seg[7] = {};
+    };
+    SegDigit clock_hh_[2] = {};
+    SegDigit clock_mm_[2] = {};
+    lv_obj_t* clock_colon_[2] = {};
+    lv_obj_t* time_hh_label_ = nullptr;  // unused legacy (kept null)
     lv_obj_t* time_mm_label_ = nullptr;
     lv_obj_t* clock_edge_weather_ = nullptr;
     lv_obj_t* clock_edge_date_ = nullptr;
+    lv_obj_t* activation_label_ = nullptr;
     lv_obj_t* shade_grab_ = nullptr;
-    lv_obj_t* clock_objs_[16] = {};
+    lv_obj_t* clock_objs_[48] = {};
     int clock_obj_n_ = 0;
     int clock_look_ = 0;
     int clock_scale_pct_ = 100;
     uint32_t clock_hh_color_ = 0xFFFFFF;
     uint32_t clock_mm_color_ = 0xFF8FA3;
+    char activation_code_[16] = {};
+    bool boot_sound_played_ = false;
 
     // Weather: large readable labels (Popka-like).
     lv_obj_t* weather_glyph_ = nullptr;
@@ -222,8 +234,9 @@ private:
     float blink_ = 0.f;
     float squint_ = 0.f;
 
-    static constexpr int kClockTicks = 14 * 60;
-    static constexpr int kWeatherTicks = 10 * 60;
-    static constexpr int kPlayTicks = 10 * 60;
-    static constexpr int kSlidesTicks = 12 * 60;
+    // Idle pages only advance by swipe — no auto carousel (felt like reloads).
+    static constexpr int kClockTicks = 24 * 60 * 60;
+    static constexpr int kWeatherTicks = 24 * 60 * 60;
+    static constexpr int kPlayTicks = 24 * 60 * 60;
+    static constexpr int kSlidesTicks = 24 * 60 * 60;
 };

@@ -36,6 +36,9 @@
 
 ## 3. Прошивка платы (когда приедет)
 
+**Windows / COM-порт:** см. **[FLASH-WINDOWS.md](./FLASH-WINDOWS.md)** (готовая `merged-binary.bin` из CI).
+
+
 ```sh
 source /path/to/esp-idf/export.sh   # ESP-IDF ≥ 6.0.1, лучше 6.1
 python3 scripts/build.py waveshare/esp32-s3-touch-amoled-1.75 \

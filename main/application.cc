@@ -772,13 +772,13 @@ void Application::ShowActivationCode(const std::string& code, const std::string&
         shown += code;
     }
 #if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
-    // Valera round face hides the stock status bar — force a short explicit line
-    // the face parser can latch onto even if the locale string is empty.
+    // Valera face: persist code then force a digit-only system line the face
+    // always parses, even if locale strings are weird.
     if (!code.empty()) {
-        shown = std::string("Код активации ") + code + " — xiaozhi.me";
         Settings act("valera", true);
         act.SetString("act_code", code);
         act.SetInt("act_bound", 0);
+        shown = std::string("CODE ") + code;
     }
 #endif
     // This sentence uses 9KB of SRAM, so we need to wait for it to finish

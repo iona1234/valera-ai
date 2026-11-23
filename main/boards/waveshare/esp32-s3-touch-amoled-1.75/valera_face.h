@@ -84,6 +84,9 @@ private:
     void BuildStations();
     void ShowShade(bool open);
     void ShowSettings(bool open);
+    void ShowCodeOverlay(bool open);
+    void BuildCodeOverlay();
+    void HideIdleChrome(bool hide);
     void OpenRadio();
     void OpenStations();
     void StationStep(int delta);
@@ -193,6 +196,11 @@ private:
     bool settings_open_ = false;
 
     // Settings page: activation code + status + radio entry.
+    lv_obj_t* code_panel_ = nullptr;
+    lv_obj_t* code_title_ = nullptr;
+    lv_obj_t* code_digits_ = nullptr;
+    lv_obj_t* code_hint_ = nullptr;
+    lv_obj_t* code_close_ = nullptr;
     lv_obj_t* settings_panel_ = nullptr;
     lv_obj_t* settings_title_ = nullptr;
     lv_obj_t* settings_code_ = nullptr;

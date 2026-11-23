@@ -134,13 +134,13 @@ void ValeraLcdDisplay::Build() {
     lv_obj_clear_flag(root_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_move_foreground(root_);
 
-    for (int i = 0; i < (int)Page::kCount; ++i) page_[i] = MakePage();
+    for (int i = 0; i < (int)Page::kCount; ++i) pages_[i] = MakePage();
 
     const int W = LV_HOR_RES;
 
     // Clock
     {
-        lv_obj_t* page = page_[(int)Page::kClock];
+        lv_obj_t* page = pages_[(int)Page::kClock];
         clock_date_ = MakeLabel(page, kMuted);
         lv_obj_align(clock_date_, LV_ALIGN_CENTER, 0, -78);
         clock_time_ = MakeLabel(page, kWhite);
@@ -159,7 +159,7 @@ void ValeraLcdDisplay::Build() {
 
     // Weather
     {
-        lv_obj_t* page = page_[(int)Page::kWeather];
+        lv_obj_t* page = pages_[(int)Page::kWeather];
         auto* title = MakeLabel(page, kMuted);
         lv_label_set_text(title, "Погода");
         lv_obj_align(title, LV_ALIGN_CENTER, 0, -90);
@@ -176,7 +176,7 @@ void ValeraLcdDisplay::Build() {
 
     // Radio — selection only. Live decode is not wired.
     {
-        lv_obj_t* page = page_[(int)Page::kRadio];
+        lv_obj_t* page = pages_[(int)Page::kRadio];
         auto* title = MakeLabel(page, kMuted);
         lv_label_set_text(title, "Радио");
         lv_obj_align(title, LV_ALIGN_CENTER, 0, -100);
@@ -193,7 +193,7 @@ void ValeraLcdDisplay::Build() {
 
     // Stations — one card, three centered controls.
     {
-        lv_obj_t* page = page_[(int)Page::kStations];
+        lv_obj_t* page = pages_[(int)Page::kStations];
         station_index_ = MakeLabel(page, kMuted);
         lv_obj_align(station_index_, LV_ALIGN_CENTER, 0, -110);
         station_name_ = MakeLabel(page, kWhite);
@@ -224,7 +224,7 @@ void ValeraLcdDisplay::Build() {
 
     // Settings — full screen, never shares the frame with stations.
     {
-        lv_obj_t* page = page_[(int)Page::kSettings];
+        lv_obj_t* page = pages_[(int)Page::kSettings];
         auto* title = MakeLabel(page, kWhite);
         lv_label_set_text(title, "Настройки");
         lv_obj_align(title, LV_ALIGN_CENTER, 0, -130);
@@ -260,7 +260,7 @@ void ValeraLcdDisplay::Build() {
 
     // Activation code — opaque full screen, created last so it stays on top.
     {
-        lv_obj_t* page = page_[(int)Page::kCode];
+        lv_obj_t* page = pages_[(int)Page::kCode];
         auto* title = MakeLabel(page, kMuted);
         lv_label_set_text(title, "КОД АКТИВАЦИИ");
         lv_obj_align(title, LV_ALIGN_CENTER, 0, -90);
@@ -278,7 +278,7 @@ void ValeraLcdDisplay::Build() {
 
     // Assistant status — one centered word, no eyes.
     {
-        lv_obj_t* page = page_[(int)Page::kStatus];
+        lv_obj_t* page = pages_[(int)Page::kStatus];
         status_label_ = MakeLabel(page, kWhite);
         lv_obj_align(status_label_, LV_ALIGN_CENTER, 0, 0);
         lv_label_set_text(status_label_, "...");
@@ -288,11 +288,11 @@ void ValeraLcdDisplay::Build() {
 void ValeraLcdDisplay::ShowPage(Page page) {
     page_ = page;
     for (int i = 0; i < (int)Page::kCount; ++i) {
-        if (!page_[i]) continue;
-        if (i == (int)page) lv_obj_clear_flag(page_[i], LV_OBJ_FLAG_HIDDEN);
-        else lv_obj_add_flag(page_[i], LV_OBJ_FLAG_HIDDEN);
+        if (!pages_[i]) continue;
+        if (i == (int)page) lv_obj_clear_flag(pages_[i], LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(pages_[i], LV_OBJ_FLAG_HIDDEN);
     }
-    if (page_[ (int)page ]) lv_obj_move_foreground(page_[(int)page]);
+    if (pages_[ (int)page ]) lv_obj_move_foreground(pages_[(int)page]);
     if (page == Page::kClock) PaintClock();
     else if (page == Page::kWeather) PaintWeather();
     else if (page == Page::kRadio) PaintRadio();

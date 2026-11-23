@@ -68,7 +68,7 @@ private:
     lv_obj_t* MakeButton(lv_obj_t* parent, int w, int h, const char* text, int id);
 
     lv_obj_t* root_ = nullptr;
-    lv_obj_t* page_[(int)Page::kCount] = {};
+    lv_obj_t* pages_[(int)Page::kCount] = {};
 
     lv_obj_t* clock_time_ = nullptr;
     lv_obj_t* clock_date_ = nullptr;

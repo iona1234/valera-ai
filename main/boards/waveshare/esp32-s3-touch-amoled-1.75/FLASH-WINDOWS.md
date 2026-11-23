@@ -73,10 +73,10 @@ python -m esptool --chip esp32s3 -p COM4 -b 460800 write_flash 0x0 merged-binary
 
 1. Отпустите BOOT, нажмите RESET (или переподключите USB).
 2. На экране должен появиться циферблат Valera / Wi‑Fi-экран.
-3. Дальше по **[SETUP.md](./SETUP.md)**:
-   - точка `Xiaozhi-XXXX` → http://192.168.4.1 → домашний Wi‑Fi;
-   - регистрация на https://xiaozhi.me;
-   - привязка кодом («Валера» или короткое BOOT).
+3. Дальше:
+   - Wi‑Fi: точка `Xiaozhi-XXXX` → http://192.168.4.1 → домашняя сеть **2.4 ГГц**;
+   - **куда идти дальше:** **[NEXT_STEPS.md](./NEXT_STEPS.md)** → сайт **https://xiaozhi.me** → код привязки;
+   - полный гайд: **[SETUP.md](./SETUP.md)**.
 
 ---
 

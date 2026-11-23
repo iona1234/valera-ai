@@ -39,24 +39,30 @@ const lv_color_t kCloud = lv_color_hex(0xC8D6E5);
 const lv_color_t kOrange = lv_color_hex(0xFF8A3D);
 
 const char* WeatherWord(int code) {
-    if (code >= 80) return "ЛИВНИ";
-    if (code >= 61) return "ДОЖДЬ";
-    if (code >= 51) return "МОРОСЬ";
-    if (code >= 45) return "ТУМАН";
-    if (code >= 3) return "ОБЛАЧНО";
-    if (code >= 1) return "ЯСНО";
-    return "ЧИСТО";
+    // Readable Russian — never show a placeholder like «ЧИСТО».
+    if (code < 0) return "";
+    if (code == 0 || code == 1) return "ясно";
+    if (code == 2 || code == 3) return "облачно";
+    if (code == 45 || code == 48) return "туман";
+    if (code == 71 || code == 73 || code == 75 || code == 77 || code == 85 || code == 86) return "снег";
+    if (code == 95 || code == 96 || code == 99) return "гроза";
+    if (code >= 80) return "ливни";
+    if (code >= 61) return "дождь";
+    if (code >= 51) return "морось";
+    if (code >= 3) return "облачно";
+    return "ясно";
 }
 
-const char* Weekday3(int wday) {
-    static const char* kD[] = {"ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"};
+const char* WeekdayFull(int wday) {
+    static const char* kD[] = {"воскресенье", "понедельник", "вторник", "среда",
+                               "четверг",     "пятница",     "суббота"};
     if (wday < 0 || wday > 6) return "";
     return kD[wday];
 }
 
-const char* Month3(int mon) {
-    static const char* kM[] = {"ЯНВ", "ФЕВ", "МАР", "АПР", "МАЙ", "ИЮН",
-                               "ИЮЛ", "АВГ", "СЕН", "ОКТ", "НОЯ", "ДЕК"};
+const char* MonthFull(int mon) {
+    static const char* kM[] = {"января", "февраля", "марта",     "апреля",  "мая",      "июня",
+                               "июля",   "августа", "сентября", "октября", "ноября", "декабря"};
     if (mon < 0 || mon > 11) return "";
     return kM[mon];
 }
@@ -216,16 +222,15 @@ void ValeraLcdDisplay::SetClockStyle(int look, int scale_pct, uint32_t hh_color,
 
 void ValeraLcdDisplay::ApplyClockStyleVisual() {
     if (!time_hh_label_ || !time_mm_label_) return;
-    float mult = 5.5f * (clock_scale_pct_ / 100.f);
-    if (clock_look_ == 1) mult *= 1.05f;   // Neon
-    if (clock_look_ == 2) mult *= 0.95f;   // Soft
-    if (clock_look_ == 3) mult *= 1.00f;   // Retro
-    if (clock_look_ == 4) mult *= 0.90f;   // Digital — slightly smaller
-    const int32_t zoom = (int32_t)(LV_SCALE_NONE * mult);
-    lv_obj_set_style_transform_scale_x(time_hh_label_, zoom, 0);
-    lv_obj_set_style_transform_scale_y(time_hh_label_, zoom, 0);
-    lv_obj_set_style_transform_scale_x(time_mm_label_, zoom, 0);
-    lv_obj_set_style_transform_scale_y(time_mm_label_, zoom, 0);
+    // Native font size only — LVGL transform_scale on bitmap fonts looks blurry
+    // (was ~5.5× zoom). Spacing nudges size without resampling glyphs.
+    const int gap = (int)(28 * (clock_scale_pct_ / 100.f));
+    lv_obj_set_style_transform_scale_x(time_hh_label_, LV_SCALE_NONE, 0);
+    lv_obj_set_style_transform_scale_y(time_hh_label_, LV_SCALE_NONE, 0);
+    lv_obj_set_style_transform_scale_x(time_mm_label_, LV_SCALE_NONE, 0);
+    lv_obj_set_style_transform_scale_y(time_mm_label_, LV_SCALE_NONE, 0);
+    lv_obj_align(time_hh_label_, LV_ALIGN_CENTER, 0, -gap);
+    lv_obj_align(time_mm_label_, LV_ALIGN_CENTER, 0, gap);
 
     lv_color_t hh = lv_color_hex(clock_hh_color_);
     lv_color_t mm = lv_color_hex(clock_mm_color_);
@@ -275,6 +280,27 @@ void ValeraLcdDisplay::BuildFace() {
         (lvgl_theme_clk && lvgl_theme_clk->text_font()) ? lvgl_theme_clk->text_font()->font()
                                                        : nullptr;
 
+    // Always-on pull-handle (not in clock_objs_): tap opens shade from any idle page.
+    shade_grab_ = MakePlain(root_);
+    lv_obj_set_size(shade_grab_, 120, 36);
+    lv_obj_align(shade_grab_, LV_ALIGN_TOP_MID, 0, 6);
+    lv_obj_add_flag(shade_grab_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_set_style_bg_opa(shade_grab_, LV_OPA_TRANSP, 0);
+    lv_obj_t* grab_bar = MakePlain(shade_grab_);
+    lv_obj_set_size(grab_bar, 56, 5);
+    lv_obj_align(grab_bar, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_radius(grab_bar, 3, 0);
+    lv_obj_set_style_bg_color(grab_bar, kEdge, 0);
+    lv_obj_set_style_bg_opa(grab_bar, LV_OPA_70, 0);
+    lv_obj_add_event_cb(
+        shade_grab_,
+        [](lv_event_t* e) {
+            if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+            auto* self = static_cast<ValeraLcdDisplay*>(lv_event_get_user_data(e));
+            if (self) self->OpenQuickShade();
+        },
+        LV_EVENT_CLICKED, this);
+
     auto make_stack = [&](lv_color_t color) -> lv_obj_t* {
         lv_obj_t* lab = lv_label_create(root_);
         lv_label_set_text(lab, "00");
@@ -287,8 +313,6 @@ void ValeraLcdDisplay::BuildFace() {
     };
     time_hh_label_ = make_stack(kWhite);
     time_mm_label_ = make_stack(kCoral);
-    lv_obj_align(time_hh_label_, LV_ALIGN_CENTER, 0, -(int)(min_side * 0.17f));
-    lv_obj_align(time_mm_label_, LV_ALIGN_CENTER, 0, (int)(min_side * 0.17f));
     Track(clock_objs_, &clock_obj_n_, 16, time_hh_label_);
     Track(clock_objs_, &clock_obj_n_, 16, time_mm_label_);
     ApplyClockStyleVisual();
@@ -298,15 +322,17 @@ void ValeraLcdDisplay::BuildFace() {
     lv_obj_set_style_text_color(clock_edge_weather_, kCoral, 0);
     lv_obj_set_style_text_align(clock_edge_weather_, LV_TEXT_ALIGN_CENTER, 0);
     if (edge_font) lv_obj_set_style_text_font(clock_edge_weather_, edge_font, 0);
-    lv_obj_align(clock_edge_weather_, LV_ALIGN_TOP_MID, 0, (int)(min_side * 0.04f));
+    lv_obj_align(clock_edge_weather_, LV_ALIGN_TOP_MID, 0, (int)(min_side * 0.10f));
     Track(clock_objs_, &clock_obj_n_, 16, clock_edge_weather_);
 
     clock_edge_date_ = lv_label_create(root_);
-    lv_label_set_text(clock_edge_date_, "");
+    lv_label_set_text(clock_edge_date_, "синхронизация…");
     lv_obj_set_style_text_color(clock_edge_date_, kEdge, 0);
     lv_obj_set_style_text_align(clock_edge_date_, LV_TEXT_ALIGN_CENTER, 0);
     if (edge_font) lv_obj_set_style_text_font(clock_edge_date_, edge_font, 0);
-    lv_obj_align(clock_edge_date_, LV_ALIGN_BOTTOM_MID, 0, -(int)(min_side * 0.05f));
+    lv_obj_set_width(clock_edge_date_, (int)(min_side * 0.78f));
+    lv_label_set_long_mode(clock_edge_date_, LV_LABEL_LONG_WRAP);
+    lv_obj_align(clock_edge_date_, LV_ALIGN_BOTTOM_MID, 0, -(int)(min_side * 0.06f));
     Track(clock_objs_, &clock_obj_n_, 16, clock_edge_date_);
 
     // Weather — large labels
@@ -740,7 +766,10 @@ void ValeraLcdDisplay::OnGesture(lv_event_t* e) {
         gesture_start_x_ = p.x;
         gesture_start_y_ = p.y;
         gesture_last_y_ = p.y;
-        gesture_from_top_ = (p.y < 64) || (shade_pull_ > 0.15f);
+        // Wide top band + already-open shade. Touch Y can be noisy on the round panel.
+        const int H = LV_VER_RES;
+        gesture_from_top_ =
+            (p.y < 140) || (p.y > H - 40) || (shade_pull_ > 0.15f);
         return;
     }
     if (!gesture_tracking_) return;
@@ -793,8 +822,13 @@ void ValeraLcdDisplay::OnGesture(lv_event_t* e) {
 
     if (assistant_active_) return;
 
-    // Swipe down from top → open shade (spring)
-    if (gesture_start_y_ < 72 && dy > 40 && ady > adx) {
+    // Swipe down from upper area → open shade (spring)
+    if (gesture_start_y_ < 160 && dy > 36 && ady > adx) {
+        ShowShade(true);
+        return;
+    }
+    // Short tap near the top handle also opens shade.
+    if (gesture_start_y_ < 56 && adx < 24 && ady < 24) {
         ShowShade(true);
         return;
     }
@@ -1027,7 +1061,8 @@ void ValeraLcdDisplay::Tick() {
     if (idle_page_ == IdlePage::kClock) {
         time_t now = time(nullptr);
         ValeraClimate climate = ValeraSensors::Get();
-        if (climate.clock_fix_ok) now += climate.clock_fix_sec;
+        // Legacy offset only if SNTP/Open-Meteo have not set the RTC yet.
+        if (climate.clock_fix_ok && !climate.time_ok) now += climate.clock_fix_sec;
         struct tm tm_info = {};
         localtime_r(&now, &tm_info);
         if (tm_info.tm_hour != last_hour_ || tm_info.tm_min != last_min_ ||
@@ -1288,19 +1323,28 @@ void ValeraLcdDisplay::PaintClock(const struct tm* tm, bool colon_on) {
     if (time_mm_label_) lv_label_set_text(time_mm_label_, mm);
 
     ValeraClimate c = ValeraSensors::Get();
-    char weather_line[48];
-    if (c.outdoor_ok) {
-        snprintf(weather_line, sizeof(weather_line), "%d° %s", (int)lroundf(c.outdoor_c),
-                 WeatherWord(c.weather_code));
-    } else {
-        snprintf(weather_line, sizeof(weather_line), "%s", WeatherWord(c.weather_code));
+    if (clock_edge_weather_) {
+        if (c.outdoor_ok) {
+            char weather_line[48];
+            snprintf(weather_line, sizeof(weather_line), "%d° %s", (int)lroundf(c.outdoor_c),
+                     WeatherWord(c.weather_code));
+            lv_label_set_text(clock_edge_weather_, weather_line);
+        } else {
+            lv_label_set_text(clock_edge_weather_, "");
+        }
     }
-    if (clock_edge_weather_) lv_label_set_text(clock_edge_weather_, weather_line);
 
-    char date_line[48];
-    snprintf(date_line, sizeof(date_line), "%s %d %s", Weekday3(tm->tm_wday), tm->tm_mday,
-             Month3(tm->tm_mon));
-    if (clock_edge_date_) lv_label_set_text(clock_edge_date_, date_line);
+    if (clock_edge_date_) {
+        const bool time_ok = c.time_ok || (tm->tm_year + 1900) >= 2024;
+        if (!time_ok) {
+            lv_label_set_text(clock_edge_date_, "время с интернета…");
+        } else {
+            char date_line[72];
+            snprintf(date_line, sizeof(date_line), "%s, %d %s", WeekdayFull(tm->tm_wday),
+                     tm->tm_mday, MonthFull(tm->tm_mon));
+            lv_label_set_text(clock_edge_date_, date_line);
+        }
+    }
 }
 
 void ValeraLcdDisplay::PaintWeather() {
@@ -1339,8 +1383,9 @@ void ValeraLcdDisplay::PaintWeather() {
 }
 
 void ValeraLcdDisplay::SetStatus(const char* status) {
-    if (status == nullptr) return;
-    LvglDisplay::SetStatus(status);
+    // Stock status bar is hidden — keep chrome clean on the round face.
+    (void)status;
+    HideStockChrome();
 }
 
 void ValeraLcdDisplay::ShowNotification(const char* notification, int duration_ms) {

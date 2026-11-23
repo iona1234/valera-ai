@@ -33,6 +33,7 @@ public:
     // Scale percent 80..160.
     void SetClockStyle(int look, int scale_pct, uint32_t hh_color, uint32_t mm_color);
     void LoadClockStyle();
+    void OpenQuickShade() { ShowShade(true); }
 
     static void RounderEventCb(lv_event_t* e);
 
@@ -98,11 +99,12 @@ private:
     lv_obj_t* root_ = nullptr;
     lv_obj_t* bezel_ = nullptr;
 
-    // Popka Stack clock (solid labels + zoom).
+    // Stack clock (native font size — no LVGL zoom blur).
     lv_obj_t* time_hh_label_ = nullptr;
     lv_obj_t* time_mm_label_ = nullptr;
     lv_obj_t* clock_edge_weather_ = nullptr;
     lv_obj_t* clock_edge_date_ = nullptr;
+    lv_obj_t* shade_grab_ = nullptr;
     lv_obj_t* clock_objs_[16] = {};
     int clock_obj_n_ = 0;
     int clock_look_ = 0;

@@ -123,16 +123,19 @@ private:
     bool pwr_long_fired_ = false;
 
     void InitializePowerSaveTimer() {
-        power_save_timer_ = new PowerSaveTimer(-1, 60, 300);
+        // Sleep dims the screen; do NOT auto PowerOff — that looked like a
+        // reboot every ~5 minutes (0:05 on the clock) while debugging on USB.
+        power_save_timer_ = new PowerSaveTimer(-1, 180, -1);
         power_save_timer_->OnEnterSleepMode([this]() {
             GetDisplay()->SetPowerSaveMode(true);
-            GetBacklight()->SetBrightness(20); });
+            GetBacklight()->SetBrightness(20);
+        });
         power_save_timer_->OnExitSleepMode([this]() {
             GetDisplay()->SetPowerSaveMode(false);
-            GetBacklight()->RestoreBrightness(); });
-        power_save_timer_->OnShutdownRequest([this](){ 
-            pmic_->PowerOff(); });
-        power_save_timer_->SetEnabled(true);
+            GetBacklight()->RestoreBrightness();
+        });
+        // Start disabled; GetBatteryLevel enables only while discharging.
+        power_save_timer_->SetEnabled(false);
     }
 
     void InitializeCodecI2c() {

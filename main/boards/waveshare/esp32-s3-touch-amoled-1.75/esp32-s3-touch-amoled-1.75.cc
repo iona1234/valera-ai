@@ -26,6 +26,8 @@
 #include "esp_io_expander_tca9554.h"
 #include "settings.h"
 
+#include <ssid_manager.h>
+
 #include <esp_lcd_touch_cst9217.h>
 #include <esp_lvgl_port.h>
 #include <lvgl.h>
@@ -263,8 +265,15 @@ private:
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
+            // Short BOOT during Starting used to always open the hotspot.
+            // On ESP32-S3 USB-Serial/JTAG, DTR/RTS often fakes a BOOT click and
+            // knocked a working station back into AP mode. Only enter hotspot if
+            // there is no saved SSID; otherwise treat as chat toggle after boot.
             if (app.GetDeviceState() == kDeviceStateStarting) {
-                EnterWifiConfigMode();
+                auto& ssids = SsidManager::GetInstance();
+                if (ssids.GetSsidList().empty()) {
+                    EnterWifiConfigMode();
+                }
                 return;
             }
             if (power_save_timer_) power_save_timer_->WakeUp();

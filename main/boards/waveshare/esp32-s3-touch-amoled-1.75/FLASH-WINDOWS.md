@@ -21,12 +21,15 @@
 
 ### Вариант из GitHub Actions (наш PR)
 
-1. Откройте: https://github.com/iona1234/valera-ai/actions/runs/44916265731  
-2. Внизу **Artifacts** → скачайте  
+1. Откройте Actions ветки:  
+   https://github.com/iona1234/valera-ai/actions?query=branch%3Acursor%2Fvalera-amoled-1-75-cb17  
+2. Возьмите **последний зелёный** run → Artifacts →  
    `xiaozhi_waveshare-esp32-s3-touch-amoled-1.75_…`  
 3. Распакуйте ZIP → внутри файл **`merged-binary.bin`**.
 
-Не делайте `erase_flash`, если не хотите стереть всё (включая будущий Wi‑Fi).
+Не делайте `erase_flash`, если не хотите стереть Wi‑Fi.  
+Если Wi‑Fi «залип» в битых данных — один раз можно стереть NVS отдельно
+(спросите агента) или полный erase только как крайняя мера.
 
 ---
 

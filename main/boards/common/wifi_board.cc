@@ -23,8 +23,10 @@
 
 static const char *TAG = "WifiBoard";
 
-// Connection timeout in seconds
-static constexpr int CONNECT_TIMEOUT_SEC = 60;
+// Connection timeout in seconds (per attempt). Soft APs / slow DHCP need headroom.
+static constexpr int CONNECT_TIMEOUT_SEC = 90;
+// How many station failures before falling back to the config hotspot.
+static constexpr int CONNECT_FAIL_BEFORE_AP = 3;
 
 WifiBoard::WifiBoard() {
     // Create connection timeout timer
@@ -102,9 +104,13 @@ void WifiBoard::TryWifiConnect() {
     bool have_ssid = !ssid_manager.GetSsidList().empty();
 
     if (have_ssid) {
-        // Start connection attempt with timeout
-        ESP_LOGI(TAG, "Starting WiFi connection attempt");
+        // Restart timeout for this attempt (ignore "already running").
+        esp_timer_stop(connect_timer_);
+        ESP_LOGI(TAG, "Starting WiFi connection attempt (fail streak %d/%d)",
+                 connect_fail_streak_, CONNECT_FAIL_BEFORE_AP);
         esp_timer_start_once(connect_timer_, CONNECT_TIMEOUT_SEC * 1000000ULL);
+        // StopConfigAp path may leave station marked active — always (re)start cleanly.
+        WifiManager::GetInstance().StopStation();
         WifiManager::GetInstance().StartStation();
     } else {
         // No SSID configured, enter config mode
@@ -119,6 +125,7 @@ void WifiBoard::OnNetworkEvent(NetworkEvent event, const std::string& data) {
         case NetworkEvent::Connected:
             // Stop timeout timer
             esp_timer_stop(connect_timer_);
+            connect_fail_streak_ = 0;
 #ifdef CONFIG_USE_ESP_BLUFI_WIFI_PROVISIONING
             // make sure blufi resources has been released
             Blufi::GetInstance().deinit();
@@ -161,9 +168,21 @@ void WifiBoard::SetNetworkEventCallback(NetworkEventCallback callback) {
 
 void WifiBoard::OnWifiConnectTimeout(void* arg) {
     auto* board = static_cast<WifiBoard*>(arg);
-    ESP_LOGW(TAG, "WiFi connection timeout, entering config mode");
-
     WifiManager::GetInstance().StopStation();
+
+    auto& ssid_manager = SsidManager::GetInstance();
+    const bool have_ssid = !ssid_manager.GetSsidList().empty();
+    board->connect_fail_streak_++;
+
+    if (have_ssid && board->connect_fail_streak_ < CONNECT_FAIL_BEFORE_AP) {
+        ESP_LOGW(TAG, "WiFi connection timeout, retry %d/%d (keep credentials)",
+                 board->connect_fail_streak_, CONNECT_FAIL_BEFORE_AP);
+        board->TryWifiConnect();
+        return;
+    }
+
+    ESP_LOGW(TAG, "WiFi connection timeout, entering config mode");
+    board->connect_fail_streak_ = 0;
     board->StartWifiConfigMode();
 }
 

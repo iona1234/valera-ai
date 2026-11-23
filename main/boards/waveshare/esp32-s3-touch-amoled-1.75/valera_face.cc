@@ -975,12 +975,16 @@ void ValeraLcdDisplay::Tick() {
             want = ActiveMode::kIdle;
             break;
         case kDeviceStateStarting:
-            // Boot splash / version — keep idle face, not the hotspot screen.
+        case kDeviceStateActivating:
+            // Boot / OTA activation — never the hotspot sheet.
             want = ActiveMode::kIdle;
             break;
         case kDeviceStateConnecting:
+            // Opening audio channel to xiaozhi.me — NOT Wi-Fi provisioning.
+            want = ActiveMode::kThink;
+            break;
         case kDeviceStateWifiConfiguring:
-            // Connecting = trying saved SSID; WifiConfiguring = hotspot AP.
+            // Only true hotspot / captive-portal mode.
             want = ActiveMode::kWifi;
             break;
         default:

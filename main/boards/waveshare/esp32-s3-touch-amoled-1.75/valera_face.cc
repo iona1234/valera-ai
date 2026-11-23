@@ -1443,9 +1443,8 @@ void ValeraLcdDisplay::Tick() {
     }
 
     if (idle_page_ == IdlePage::kClock) {
+        // Wall clock comes from SNTP / Open-Meteo via settimeofday (see ValeraSensors).
         time_t now = time(nullptr);
-        ValeraClimate climate = ValeraSensors::Get();
-        if (climate.clock_fix_ok && !climate.time_ok) now += climate.clock_offset_sec;
         struct tm tm_info = {};
         localtime_r(&now, &tm_info);
         const bool blink = ((tick_ / 30) % 2) == 0;

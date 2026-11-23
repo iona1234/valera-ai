@@ -950,7 +950,7 @@ void ValeraLcdDisplay::PaintWifiHint() {
     }
 
     // Station connect in progress (saved SSID, not hotspot).
-    if (wifi_title_) lv_label_set_text(wifi_title_, "Подключение…");
+    if (wifi_title_) lv_label_set_text(wifi_title_, "Подключение к Wi‑Fi");
     std::string try_ssid = wifi.GetSsid();
     if (try_ssid.empty()) {
         auto list = SsidManager::GetInstance().GetSsidList();
@@ -960,10 +960,10 @@ void ValeraLcdDisplay::PaintWifiHint() {
     if (try_ssid.size() > 28) try_ssid = try_ssid.substr(0, 27) + "…";
     if (wifi_ssid_) lv_label_set_text(wifi_ssid_, try_ssid.c_str());
     snprintf(hint, sizeof(hint),
-             "Ищу сеть 2.4 ГГц…\n"
-             "Если снова hotspot —\n"
-             "проверьте пароль\n"
-             "и диапазон роутера");
+             "Жду сеть 2.4 ГГц…\n"
+             "Если в роутере уже\n"
+             "виден IP — нажмите\n"
+             "RESET на плате");
     if (wifi_hint_) lv_label_set_text(wifi_hint_, hint);
 }
 
@@ -1017,10 +1017,21 @@ void ValeraLcdDisplay::Tick() {
             // Opening audio channel to xiaozhi.me — NOT Wi-Fi provisioning.
             want = ActiveMode::kThink;
             break;
-        case kDeviceStateWifiConfiguring:
-            // Only true hotspot / captive-portal mode.
-            want = ActiveMode::kWifi;
+        case kDeviceStateWifiConfiguring: {
+            // Hotspot sheet only while the captive portal AP is up.
+            // After the portal, state stays WifiConfiguring during station
+            // join — if STA is already online, show idle (code comes next).
+            auto& wifi = WifiManager::GetInstance();
+            if (wifi.IsConnected()) {
+                want = ActiveMode::kIdle;
+            } else if (wifi.IsConfigMode()) {
+                want = ActiveMode::kWifi;
+            } else {
+                // Station attempt in progress (saved MyWiFi, not hotspot).
+                want = ActiveMode::kWifi;
+            }
             break;
+        }
         default:
             want = ActiveMode::kThink;
             break;

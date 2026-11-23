@@ -102,6 +102,18 @@ void WifiBoard::StartNetwork() {
 void WifiBoard::TryWifiConnect() {
     auto& ssid_manager = SsidManager::GetInstance();
     bool have_ssid = !ssid_manager.GetSsidList().empty();
+    auto& wifi = WifiManager::GetInstance();
+
+    // Already online (router has DHCP lease) — do not StopStation/restart,
+    // that caused a stuck "Подключение…" screen with no activation code.
+    if (wifi.IsConnected()) {
+        esp_timer_stop(connect_timer_);
+        connect_fail_streak_ = 0;
+        in_config_mode_ = false;
+        ESP_LOGI(TAG, "Station already connected (%s), skip reconnect", wifi.GetSsid().c_str());
+        OnNetworkEvent(NetworkEvent::Connected, wifi.GetSsid());
+        return;
+    }
 
     if (have_ssid) {
         // Restart timeout for this attempt (ignore "already running").
@@ -110,8 +122,8 @@ void WifiBoard::TryWifiConnect() {
                  connect_fail_streak_, CONNECT_FAIL_BEFORE_AP);
         esp_timer_start_once(connect_timer_, CONNECT_TIMEOUT_SEC * 1000000ULL);
         // StopConfigAp path may leave station marked active — always (re)start cleanly.
-        WifiManager::GetInstance().StopStation();
-        WifiManager::GetInstance().StartStation();
+        wifi.StopStation();
+        wifi.StartStation();
     } else {
         // No SSID configured, enter config mode
         // Wait for the board version to be shown
@@ -168,7 +180,17 @@ void WifiBoard::SetNetworkEventCallback(NetworkEventCallback callback) {
 
 void WifiBoard::OnWifiConnectTimeout(void* arg) {
     auto* board = static_cast<WifiBoard*>(arg);
-    WifiManager::GetInstance().StopStation();
+    auto& wifi = WifiManager::GetInstance();
+
+    // Late DHCP / missed event: treat as success instead of tearing the link down.
+    if (wifi.IsConnected()) {
+        ESP_LOGW(TAG, "Connect timer fired but station is up — signaling Connected");
+        board->connect_fail_streak_ = 0;
+        board->OnNetworkEvent(NetworkEvent::Connected, wifi.GetSsid());
+        return;
+    }
+
+    wifi.StopStation();
 
     auto& ssid_manager = SsidManager::GetInstance();
     const bool have_ssid = !ssid_manager.GetSsidList().empty();

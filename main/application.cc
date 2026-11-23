@@ -338,6 +338,17 @@ void Application::HandleActivationDoneEvent() {
 
     has_server_time_ = ota_->HasServerTime();
 
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+    // Only clear the face code after a real OTA handshake (MQTT/WS config and
+    // no pending activation). Failed CheckVersion must keep the banner / retry.
+    if (ota_ && (ota_->HasMqttConfig() || ota_->HasWebsocketConfig()) &&
+        !ota_->HasActivationCode() && !ota_->HasActivationChallenge()) {
+        Settings act("valera", true);
+        act.SetInt("act_bound", 1);
+        act.EraseKey("act_code");
+    }
+#endif
+
     // Protocol start may have already raised MAIN_EVENT_ERROR. Do not replace
     // that alert with the "ready" UI/sound — the main loop can process both
     // events back-to-back because the activation task is lower priority.
@@ -459,6 +470,11 @@ void Application::CheckNewVersion() {
             retry_count++;
             if (retry_count >= MAX_RETRY) {
                 ESP_LOGE(TAG, "Too many retries, exit version check");
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+                // Surface the failure on the round face (stock status bar is hidden).
+                display->SetChatMessage(
+                    "system", "Нет связи с xiaozhi.me — код не пришёл. Проверьте интернет.");
+#endif
                 return;
             }
 
@@ -755,6 +771,16 @@ void Application::ShowActivationCode(const std::string& code, const std::string&
         if (!shown.empty()) shown += " ";
         shown += code;
     }
+#if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
+    // Valera round face hides the stock status bar — force a short explicit line
+    // the face parser can latch onto even if the locale string is empty.
+    if (!code.empty()) {
+        shown = std::string("Код активации ") + code + " — xiaozhi.me";
+        Settings act("valera", true);
+        act.SetString("act_code", code);
+        act.SetInt("act_bound", 0);
+    }
+#endif
     // This sentence uses 9KB of SRAM, so we need to wait for it to finish
     Alert(Lang::Strings::ACTIVATION, shown.c_str(), "link", Lang::Sounds::OGG_ACTIVATION);
 

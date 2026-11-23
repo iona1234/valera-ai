@@ -168,12 +168,12 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     port_cfg.task_affinity = 1;
 #endif
 #if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
-    // Valera AMOLED face targets 60 fps: tick LVGL ~every frame, keep audio
-    // on its own core/priority. Partial refresh stays on; only dirty regions
-    // are flushed over QSPI.
+    // HaloWatch-like cadence on CO5300: LVGL must outrank idle work or the
+    // face stalls well below 60 fps. Audio stays on its own core.
+    port_cfg.task_priority = 5;
     port_cfg.timer_period_ms = 16;
     port_cfg.task_max_sleep_ms = 16;
-    port_cfg.task_stack = 1024 * 10;
+    port_cfg.task_stack = 1024 * 12;
 #endif
     lvgl_port_init(&port_cfg);
 
@@ -182,9 +182,9 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     // A full-frame transfer (~150KB) cannot allocate that bounce buffer, so
     // keep a small DMA strip in internal SRAM and partial refresh.
 #if CONFIG_BOARD_TYPE_WAVESHARE_ESP32_S3_TOUCH_AMOLED_1_75
-    // Dual PSRAM draw buffers + partial refresh. Taller strips = fewer flush
-    // rounds per dirty frame (Popka-style smoothness on 466² AMOLED).
-    const uint32_t draw_buffer_pixels = static_cast<uint32_t>(width_ * 80);
+    // Dual PSRAM draw buffers + partial refresh. Taller strips ≈ Halo's
+    // 16-row DMA packs: fewer QSPI round-trips per dirty frame.
+    const uint32_t draw_buffer_pixels = static_cast<uint32_t>(width_ * 116);
     const bool use_double_buffer = true;
     const unsigned buff_dma = 0;
     const unsigned buff_spiram = 1;

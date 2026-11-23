@@ -42,6 +42,10 @@
 #define EXAMPLE_PIN_NUM_LCD_DATA1 GPIO_NUM_5
 #define EXAMPLE_PIN_NUM_LCD_DATA2 GPIO_NUM_6
 #define EXAMPLE_PIN_NUM_LCD_DATA3 GPIO_NUM_7
+// CO5300 TE (tearing-effect) — same pin as HaloWatch on Waveshare AMOLED 1.75.
+// Init enables TEON (0x35); LVGL partial flush still used (full Halo TE engine
+// is a separate stack without LVGL).
+#define EXAMPLE_PIN_NUM_LCD_TE GPIO_NUM_13
 
 #define DISPLAY_WIDTH 466
 #define DISPLAY_HEIGHT 466

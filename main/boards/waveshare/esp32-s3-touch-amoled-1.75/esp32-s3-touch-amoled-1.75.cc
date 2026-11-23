@@ -348,6 +348,7 @@ private:
     }
 
     void InitializeTouch() {
+        // CST9217 same as HaloWatch: raw axes are mirrored → x=466-x, y=466-y.
         esp_lcd_touch_handle_t tp;
         esp_lcd_touch_config_t tp_cfg = {
             .x_max = DISPLAY_WIDTH - 1,

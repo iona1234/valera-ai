@@ -14,6 +14,7 @@
 #include <wifi_manager.h>
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -54,16 +55,16 @@ const char* WeatherWord(int code) {
     return "ясно";
 }
 
-const char* WeekdayFull(int wday) {
-    static const char* kD[] = {"воскресенье", "понедельник", "вторник", "среда",
-                               "четверг",     "пятница",     "суббота"};
+// HaloWatch-style short date — fits the round bezel (no wrap / clip).
+const char* WeekdayShort(int wday) {
+    static const char* kD[] = {"ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"};
     if (wday < 0 || wday > 6) return "";
     return kD[wday];
 }
 
-const char* MonthFull(int mon) {
-    static const char* kM[] = {"января", "февраля", "марта",     "апреля",  "мая",      "июня",
-                               "июля",   "августа", "сентября", "октября", "ноября", "декабря"};
+const char* MonthShort(int mon) {
+    static const char* kM[] = {"ЯНВ", "ФЕВ", "МАР", "АПР", "МАЙ", "ИЮН",
+                               "ИЮЛ", "АВГ", "СЕН", "ОКТ", "НОЯ", "ДЕК"};
     if (mon < 0 || mon > 11) return "";
     return kM[mon];
 }
@@ -270,7 +271,8 @@ void ValeraLcdDisplay::SetSegDigit(SegDigit* d, int value, lv_color_t color) {
         if (!d->seg[i]) continue;
         const bool on = (m >> i) & 1;
         lv_obj_set_style_bg_color(d->seg[i], color, 0);
-        lv_obj_set_style_bg_opa(d->seg[i], on ? LV_OPA_COVER : LV_OPA_20, 0);
+        // Dim off-segments lightly — full hide thrashing kills QSPI FPS.
+        lv_obj_set_style_bg_opa(d->seg[i], on ? LV_OPA_COVER : LV_OPA_10, 0);
     }
 }
 
@@ -297,6 +299,7 @@ void ValeraLcdDisplay::ApplyClockStyleVisual() {
     for (int i = 0; i < 2; ++i) {
         if (clock_colon_[i]) lv_obj_set_style_bg_color(clock_colon_[i], mm, 0);
     }
+    last_seg_hh_[0] = last_seg_hh_[1] = last_seg_mm_[0] = last_seg_mm_[1] = -1;
 }
 
 void ValeraLcdDisplay::BuildFace() {
@@ -349,25 +352,35 @@ void ValeraLcdDisplay::BuildFace() {
         },
         LV_EVENT_CLICKED, this);
 
-    // Large sharp Stack clock (Popka SC_STACK / SC_LCD idea): 7-seg, ~110px tall.
-    const int dig_w = (int)(min_side * 0.16f);
-    const int dig_h = (int)(min_side * 0.24f);
-    const int dig_t = (int)(min_side * 0.028f);
-    const int gap_x = (int)(min_side * 0.04f);
-    const int row_gap = (int)(min_side * 0.06f);
-    const int hh_cy = cy - dig_h / 2 - row_gap / 2;
-    const int mm_cy = cy + dig_h / 2 + row_gap / 2;
-    BuildSegDigit(&clock_hh_[0], cx - dig_w / 2 - gap_x / 2, hh_cy, dig_w, dig_h, dig_t);
-    BuildSegDigit(&clock_hh_[1], cx + dig_w / 2 + gap_x / 2, hh_cy, dig_w, dig_h, dig_t);
-    BuildSegDigit(&clock_mm_[0], cx - dig_w / 2 - gap_x / 2, mm_cy, dig_w, dig_h, dig_t);
-    BuildSegDigit(&clock_mm_[1], cx + dig_w / 2 + gap_x / 2, mm_cy, dig_w, dig_h, dig_t);
+    // HaloWatch face geometry (scaled to 466): ONE horizontal HH:MM row,
+    // date above, weather pill below — all inside the round safe circle.
+    // FACE_SCALE≈1.2 → digit height ~38% of diameter.
+    const float scale = (clock_scale_pct_ / 100.f) * 1.15f;
+    const int dig_w = (int)(min_side * 0.155f * scale);
+    const int dig_h = (int)(min_side * 0.36f * scale);
+    const int dig_t = (int)(min_side * 0.032f * scale);
+    const int gap_x = (int)(min_side * 0.018f * scale);
+    const int colon_gap = (int)(min_side * 0.04f * scale);
+    // Colon on center; HH left of colon, MM right — Halo FACE_TIME_Y ≈ cy.
+    const int time_cy = cy - (int)(min_side * 0.02f);
+    const int colon_w = dig_t;
+    const int cell = dig_w + gap_x;
+    const int hh1_cx = cx - colon_gap / 2 - cell / 2 - dig_w / 2;
+    const int hh0_cx = hh1_cx - cell;
+    const int mm0_cx = cx + colon_gap / 2 + cell / 2 + dig_w / 2;
+    const int mm1_cx = mm0_cx + cell;
+    BuildSegDigit(&clock_hh_[0], hh0_cx, time_cy, dig_w, dig_h, dig_t);
+    BuildSegDigit(&clock_hh_[1], hh1_cx, time_cy, dig_w, dig_h, dig_t);
+    BuildSegDigit(&clock_mm_[0], mm0_cx, time_cy, dig_w, dig_h, dig_t);
+    BuildSegDigit(&clock_mm_[1], mm1_cx, time_cy, dig_w, dig_h, dig_t);
     for (int i = 0; i < 2; ++i) {
         clock_colon_[i] = MakePlain(root_);
-        lv_obj_set_size(clock_colon_[i], dig_t, dig_t);
-        lv_obj_set_style_radius(clock_colon_[i], dig_t / 2, 0);
+        lv_obj_set_size(clock_colon_[i], colon_w, colon_w);
+        lv_obj_set_style_radius(clock_colon_[i], colon_w / 2, 0);
         lv_obj_set_style_bg_color(clock_colon_[i], kCoral, 0);
         lv_obj_set_style_bg_opa(clock_colon_[i], LV_OPA_COVER, 0);
-        lv_obj_set_pos(clock_colon_[i], cx - dig_t / 2, cy - dig_t * 2 + i * dig_t * 3);
+        const int cy_dot = time_cy + (i == 0 ? -dig_h / 5 : dig_h / 5) - colon_w / 2;
+        lv_obj_set_pos(clock_colon_[i], cx - colon_w / 2, cy_dot);
         Track(clock_objs_, &clock_obj_n_, 48, clock_colon_[i]);
     }
     SetSegDigit(&clock_hh_[0], 0, kWhite);
@@ -376,33 +389,55 @@ void ValeraLcdDisplay::BuildFace() {
     SetSegDigit(&clock_mm_[1], 0, kCoral);
     ApplyClockStyleVisual();
 
-    clock_edge_weather_ = lv_label_create(root_);
-    lv_label_set_text(clock_edge_weather_, "");
-    lv_obj_set_style_text_color(clock_edge_weather_, kCoral, 0);
-    lv_obj_set_style_text_align(clock_edge_weather_, LV_TEXT_ALIGN_CENTER, 0);
-    if (edge_font) lv_obj_set_style_text_font(clock_edge_weather_, edge_font, 0);
-    lv_obj_align(clock_edge_weather_, LV_ALIGN_TOP_MID, 0, (int)(min_side * 0.10f));
-    Track(clock_objs_, &clock_obj_n_, 48, clock_edge_weather_);
-
+    // Date ABOVE the clock (Halo FACE_DATE) — short form so it never clips.
     clock_edge_date_ = lv_label_create(root_);
     lv_label_set_text(clock_edge_date_, "");
-    lv_obj_set_style_text_color(clock_edge_date_, kEdge, 0);
+    lv_obj_set_style_text_color(clock_edge_date_, lv_color_hex(0xC2C3CB), 0);
     lv_obj_set_style_text_align(clock_edge_date_, LV_TEXT_ALIGN_CENTER, 0);
     if (edge_font) lv_obj_set_style_text_font(clock_edge_date_, edge_font, 0);
-    lv_obj_set_width(clock_edge_date_, (int)(min_side * 0.78f));
-    lv_label_set_long_mode(clock_edge_date_, LV_LABEL_LONG_WRAP);
-    lv_obj_align(clock_edge_date_, LV_ALIGN_BOTTOM_MID, 0, -(int)(min_side * 0.06f));
+    lv_obj_set_width(clock_edge_date_, (int)(min_side * 0.70f));
+    lv_label_set_long_mode(clock_edge_date_, LV_LABEL_LONG_CLIP);
+    lv_obj_align(clock_edge_date_, LV_ALIGN_TOP_MID, 0, (int)(min_side * 0.14f));
     Track(clock_objs_, &clock_obj_n_, 48, clock_edge_date_);
 
+    // Weather pill BELOW the clock (Halo PILL_Y).
+    const int pill_w = (int)(min_side * 0.42f);
+    const int pill_h = (int)(min_side * 0.14f);
+    clock_wx_pill_ = MakePlain(root_);
+    lv_obj_set_size(clock_wx_pill_, pill_w, pill_h);
+    lv_obj_align(clock_wx_pill_, LV_ALIGN_CENTER, 0, (int)(min_side * 0.28f));
+    lv_obj_set_style_radius(clock_wx_pill_, pill_h / 2, 0);
+    lv_obj_set_style_bg_color(clock_wx_pill_, lv_color_hex(0x2D2F2F), 0);
+    lv_obj_set_style_bg_opa(clock_wx_pill_, LV_OPA_COVER, 0);
+    Track(clock_objs_, &clock_obj_n_, 48, clock_wx_pill_);
+
+    clock_edge_weather_ = lv_label_create(clock_wx_pill_);
+    lv_label_set_text(clock_edge_weather_, "");
+    lv_obj_set_style_text_color(clock_edge_weather_, kWhite, 0);
+    lv_obj_set_style_text_align(clock_edge_weather_, LV_TEXT_ALIGN_CENTER, 0);
+    if (edge_font) lv_obj_set_style_text_font(clock_edge_weather_, edge_font, 0);
+    lv_obj_center(clock_edge_weather_);
+
+    // Activation code under the pill — stays visible until bound.
     activation_label_ = lv_label_create(root_);
     lv_label_set_text(activation_label_, "");
     lv_obj_set_style_text_color(activation_label_, kCyan, 0);
     lv_obj_set_style_text_align(activation_label_, LV_TEXT_ALIGN_CENTER, 0);
     if (edge_font) lv_obj_set_style_text_font(activation_label_, edge_font, 0);
-    lv_obj_set_width(activation_label_, (int)(min_side * 0.85f));
+    lv_obj_set_width(activation_label_, (int)(min_side * 0.72f));
     lv_label_set_long_mode(activation_label_, LV_LABEL_LONG_WRAP);
-    lv_obj_align(activation_label_, LV_ALIGN_CENTER, 0, (int)(min_side * 0.32f));
+    lv_obj_align(activation_label_, LV_ALIGN_CENTER, 0, (int)(min_side * 0.40f));
     lv_obj_add_flag(activation_label_, LV_OBJ_FLAG_HIDDEN);
+    // Persist any code saved across reboot.
+    {
+        Settings s("valera", false);
+        std::string saved = s.GetString("act_code");
+        if (saved.size() >= 4 && saved.size() <= 8) {
+            std::strncpy(activation_code_, saved.c_str(), sizeof(activation_code_) - 1);
+            activation_code_[sizeof(activation_code_) - 1] = '\0';
+        }
+        activation_bound_ = s.GetInt("act_bound", 0) != 0;
+    }
 
     // Weather — large labels
     weather_glyph_ = MakePlain(root_);
@@ -621,12 +656,13 @@ void ValeraLcdDisplay::BuildShade() {
     auto* theme = static_cast<LvglTheme*>(current_theme_);
     const lv_font_t* text_font =
         (theme && theme->text_font()) ? theme->text_font()->font() : nullptr;
-    shade_panel_h_ = (int)(LV_VER_RES * 0.78f);
-    const int row_h = 56;
-    const int row_gap = 8;
-    const int row_w = LV_HOR_RES - 56;
+    // Full round disc (Halo-style overlay) — not a skewed rectangle sheet.
+    shade_panel_h_ = LV_VER_RES;
+    const int row_h = 52;
+    const int row_gap = 6;
+    const int row_w = (int)(LV_HOR_RES * 0.78f);
+    const int rows_top = (int)(LV_VER_RES * 0.18f);
 
-    // Dim scrim behind the sheet (phone Control Center feel).
     shade_scrim_ = MakePlain(root_);
     lv_obj_set_size(shade_scrim_, LV_HOR_RES, LV_VER_RES);
     lv_obj_set_pos(shade_scrim_, 0, 0);
@@ -638,52 +674,63 @@ void ValeraLcdDisplay::BuildShade() {
     shade_panel_ = MakePlain(root_);
     lv_obj_set_size(shade_panel_, LV_HOR_RES, shade_panel_h_);
     lv_obj_set_pos(shade_panel_, 0, -shade_panel_h_);
-    lv_obj_set_style_radius(shade_panel_, 40, 0);
-    lv_obj_set_style_bg_color(shade_panel_, lv_color_hex(0x121820), 0);
+    lv_obj_set_style_radius(shade_panel_, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_clip_corner(shade_panel_, true, 0);
+    lv_obj_set_style_bg_color(shade_panel_, lv_color_hex(0x0E1218), 0);
     lv_obj_set_style_bg_opa(shade_panel_, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(shade_panel_, 0, 0);
-    // No LVGL shadow — soft shadows kill FPS on partial QSPI refresh.
     lv_obj_set_style_shadow_width(shade_panel_, 0, 0);
     lv_obj_add_flag(shade_panel_, LV_OBJ_FLAG_CLICKABLE);
-    // Gestures only on root_ — avoid double handlers on panel.
+    // Drag-to-close lives on the panel (rows steal taps from root when open).
+    lv_obj_add_event_cb(shade_panel_, ShadePanelEventCb, LV_EVENT_PRESSED, this);
+    lv_obj_add_event_cb(shade_panel_, ShadePanelEventCb, LV_EVENT_PRESSING, this);
+    lv_obj_add_event_cb(shade_panel_, ShadePanelEventCb, LV_EVENT_RELEASED, this);
     Track(shade_objs_, &shade_obj_n_, 20, shade_panel_);
 
     shade_handle_ = MakePlain(shade_panel_);
-    lv_obj_set_size(shade_handle_, 64, 6);
-    lv_obj_align(shade_handle_, LV_ALIGN_TOP_MID, 0, 16);
+    lv_obj_set_size(shade_handle_, 72, 6);
+    lv_obj_align(shade_handle_, LV_ALIGN_TOP_MID, 0, (int)(LV_VER_RES * 0.08f));
     lv_obj_set_style_radius(shade_handle_, 4, 0);
     lv_obj_set_style_bg_color(shade_handle_, lv_color_hex(0x6a7a90), 0);
     lv_obj_set_style_bg_opa(shade_handle_, LV_OPA_COVER, 0);
 
     shade_title_ = lv_label_create(shade_panel_);
-    lv_label_set_text(shade_title_, "Быстрые настройки");
+    lv_label_set_text(shade_title_, "Настройки");
     lv_obj_set_style_text_color(shade_title_, kWhite, 0);
     lv_obj_set_style_text_align(shade_title_, LV_TEXT_ALIGN_CENTER, 0);
     if (text_font) lv_obj_set_style_text_font(shade_title_, text_font, 0);
-    lv_obj_align(shade_title_, LV_ALIGN_TOP_MID, 0, 36);
+    lv_obj_align(shade_title_, LV_ALIGN_TOP_MID, 0, (int)(LV_VER_RES * 0.11f));
 
     static const char* kLabels[6] = {"Яркость", "Громкость", "Wi‑Fi",
                                      "Тема", "Always On", "Сброс Wi‑Fi"};
     for (int i = 0; i < 6; ++i) {
         shade_row_btn_[i] = MakePlain(shade_panel_);
         lv_obj_set_size(shade_row_btn_[i], row_w, row_h);
-        lv_obj_align(shade_row_btn_[i], LV_ALIGN_TOP_MID, 0, 78 + i * (row_h + row_gap));
+        lv_obj_align(shade_row_btn_[i], LV_ALIGN_TOP_MID, 0, rows_top + i * (row_h + row_gap));
         lv_obj_set_style_radius(shade_row_btn_[i], row_h / 2, 0);
         lv_obj_set_style_bg_color(shade_row_btn_[i], lv_color_hex(0x1a2430), 0);
         lv_obj_set_style_bg_opa(shade_row_btn_[i], LV_OPA_COVER, 0);
-        lv_obj_clear_flag(shade_row_btn_[i], LV_OBJ_FLAG_CLICKABLE);
+        // Real LVGL buttons — previous hit-test never ran (panel ate events).
+        lv_obj_add_flag(shade_row_btn_[i], LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_clear_flag(shade_row_btn_[i], LV_OBJ_FLAG_EVENT_BUBBLE);
+        lv_obj_set_user_data(shade_row_btn_[i], (void*)(intptr_t)i);
+        lv_obj_add_event_cb(shade_row_btn_[i], ShadeRowEventCb, LV_EVENT_CLICKED, this);
+        lv_obj_add_event_cb(shade_row_btn_[i], ShadeRowEventCb, LV_EVENT_PRESSED, this);
+        lv_obj_add_event_cb(shade_row_btn_[i], ShadeRowEventCb, LV_EVENT_RELEASED, this);
 
         shade_row_label_[i] = lv_label_create(shade_row_btn_[i]);
         lv_label_set_text(shade_row_label_[i], kLabels[i]);
         lv_obj_set_style_text_color(shade_row_label_[i], kEdge, 0);
         if (text_font) lv_obj_set_style_text_font(shade_row_label_[i], text_font, 0);
-        lv_obj_align(shade_row_label_[i], LV_ALIGN_LEFT_MID, 22, 0);
+        lv_obj_align(shade_row_label_[i], LV_ALIGN_LEFT_MID, 18, 0);
+        lv_obj_clear_flag(shade_row_label_[i], LV_OBJ_FLAG_CLICKABLE);
 
         shade_row_value_[i] = lv_label_create(shade_row_btn_[i]);
         lv_label_set_text(shade_row_value_[i], "—");
         lv_obj_set_style_text_color(shade_row_value_[i], kWhite, 0);
         if (text_font) lv_obj_set_style_text_font(shade_row_value_[i], text_font, 0);
-        lv_obj_align(shade_row_value_[i], LV_ALIGN_RIGHT_MID, -22, 0);
+        lv_obj_align(shade_row_value_[i], LV_ALIGN_RIGHT_MID, -18, 0);
+        lv_obj_clear_flag(shade_row_value_[i], LV_OBJ_FLAG_CLICKABLE);
     }
 
     shade_pull_ = 0.f;
@@ -777,51 +824,60 @@ void ValeraLcdDisplay::CycleTheme() {
     RefreshShade();
 }
 
-void ValeraLcdDisplay::HandleShadeTap(int16_t x, int16_t y) {
-    (void)x;
-    if (!shade_panel_ || shade_pull_ < 0.85f) return;
-    // Row hit-test in panel local coords (panel y ≈ 0 when open).
-    const int local_y = y - lv_obj_get_y(shade_panel_);
-    for (int i = 0; i < 6; ++i) {
-        if (!shade_row_btn_[i]) continue;
-        const int top = lv_obj_get_y(shade_row_btn_[i]);
-        const int bot = top + lv_obj_get_height(shade_row_btn_[i]);
-        if (local_y < top || local_y > bot) continue;
-        // Press feedback
-        lv_obj_set_style_bg_color(shade_row_btn_[i], lv_color_hex(0x243040), 0);
-        if (i == 0) {
-            if (auto* bl = Board::GetInstance().GetBacklight()) {
-                int b = bl->brightness() + 15;
-                if (b > 100) b = 20;
-                bl->SetBrightness((uint8_t)b, true);
-            }
-        } else if (i == 1) {
-            if (auto* codec = Board::GetInstance().GetAudioCodec()) {
-                int v = codec->output_volume() + 10;
-                if (v > 100) v = 20;
-                codec->SetOutputVolume(v);
-            }
-        } else if (i == 3) {
-            CycleTheme();
-        } else if (i == 5) {
-            ShowShade(false);
-            Application::GetInstance().Schedule([]() {
-                auto* wifi = static_cast<WifiBoard*>(&Board::GetInstance());
-                wifi->EnterWifiConfigMode();
-            });
+void ValeraLcdDisplay::ApplyShadeRowAction(int row) {
+    if (row < 0 || row > 5 || shade_pull_ < 0.55f) return;
+    if (row == 0) {
+        if (auto* bl = Board::GetInstance().GetBacklight()) {
+            int b = bl->brightness() + 15;
+            if (b > 100) b = 20;
+            bl->SetBrightness((uint8_t)b, true);
         }
-        RefreshShade();
-        lv_obj_set_style_bg_color(shade_row_btn_[i], lv_color_hex(0x1a2430), 0);
+    } else if (row == 1) {
+        if (auto* codec = Board::GetInstance().GetAudioCodec()) {
+            int v = codec->output_volume() + 10;
+            if (v > 100) v = 20;
+            codec->SetOutputVolume(v);
+        }
+    } else if (row == 3) {
+        CycleTheme();
+    } else if (row == 5) {
+        ShowShade(false);
+        Application::GetInstance().Schedule([]() {
+            auto* wifi = static_cast<WifiBoard*>(&Board::GetInstance());
+            wifi->EnterWifiConfigMode();
+        });
         return;
     }
+    RefreshShade();
 }
 
-void ValeraLcdDisplay::GestureEventCb(lv_event_t* e) {
+void ValeraLcdDisplay::ShadeRowEventCb(lv_event_t* e) {
     auto* self = static_cast<ValeraLcdDisplay*>(lv_event_get_user_data(e));
-    if (self) self->OnGesture(e);
+    if (!self) return;
+    lv_obj_t* target = (lv_obj_t*)lv_event_get_target(e);
+    const int row = (int)(intptr_t)lv_obj_get_user_data(target);
+    const lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_PRESSED && row >= 0 && row < 6 && self->shade_row_btn_[row]) {
+        lv_obj_set_style_bg_color(self->shade_row_btn_[row], lv_color_hex(0x2a3848), 0);
+        return;
+    }
+    if (code == LV_EVENT_RELEASED && row >= 0 && row < 6 && self->shade_row_btn_[row]) {
+        lv_obj_set_style_bg_color(self->shade_row_btn_[row], lv_color_hex(0x1a2430), 0);
+        return;
+    }
+    if (code == LV_EVENT_CLICKED) self->ApplyShadeRowAction(row);
 }
 
-void ValeraLcdDisplay::OnGesture(lv_event_t* e) {
+void ValeraLcdDisplay::ShadePanelEventCb(lv_event_t* e) {
+    auto* self = static_cast<ValeraLcdDisplay*>(lv_event_get_user_data(e));
+    if (self) self->OnShadePanelGesture(e);
+}
+
+void ValeraLcdDisplay::OnShadePanelGesture(lv_event_t* e) {
+    // Only drag-close from empty panel / handle — rows handle their own clicks.
+    lv_obj_t* target = (lv_obj_t*)lv_event_get_target(e);
+    if (target != shade_panel_) return;
+
     const lv_event_code_t code = lv_event_get_code(e);
     lv_indev_t* indev = lv_indev_active();
     if (!indev) return;
@@ -834,27 +890,65 @@ void ValeraLcdDisplay::OnGesture(lv_event_t* e) {
         gesture_start_x_ = p.x;
         gesture_start_y_ = p.y;
         gesture_last_y_ = p.y;
-        // Wide top band + already-open shade. Touch Y can be noisy on the round panel.
-        const int H = LV_VER_RES;
-        gesture_from_top_ =
-            (p.y < 140) || (p.y > H - 40) || (shade_pull_ > 0.15f);
+        gesture_from_top_ = true;
+        return;
+    }
+    if (!gesture_tracking_) return;
+    if (code == LV_EVENT_PRESSING) {
+        gesture_last_y_ = p.y;
+        const int dy = p.y - gesture_start_y_;
+        if (dy < -6 || shade_dragging_) {
+            shade_dragging_ = true;
+            SetShadePull(1.f + (float)dy / (float)shade_panel_h_);
+        }
+        return;
+    }
+    if (code != LV_EVENT_RELEASED) return;
+    gesture_tracking_ = false;
+    const int dy = p.y - gesture_start_y_;
+    if (shade_dragging_) {
+        shade_dragging_ = false;
+        shade_target_ = (shade_pull_ < 0.55f || dy < -40) ? 0.f : 1.f;
+        return;
+    }
+    // Tap on empty disc area → close.
+    if (dy > -20 && dy < 20) ShowShade(false);
+}
+
+void ValeraLcdDisplay::GestureEventCb(lv_event_t* e) {
+    auto* self = static_cast<ValeraLcdDisplay*>(lv_event_get_user_data(e));
+    if (self) self->OnGesture(e);
+}
+
+void ValeraLcdDisplay::OnGesture(lv_event_t* e) {
+    // When the shade disc is open, panel/rows own the finger.
+    if (shade_pull_ > 0.15f) return;
+
+    const lv_event_code_t code = lv_event_get_code(e);
+    lv_indev_t* indev = lv_indev_active();
+    if (!indev) return;
+    lv_point_t p{};
+    lv_indev_get_point(indev, &p);
+
+    if (code == LV_EVENT_PRESSED) {
+        gesture_tracking_ = true;
+        shade_dragging_ = false;
+        gesture_start_x_ = p.x;
+        gesture_start_y_ = p.y;
+        gesture_last_y_ = p.y;
+        gesture_from_top_ = (p.y < 140) || (p.y > LV_VER_RES - 40);
         return;
     }
     if (!gesture_tracking_) return;
 
     if (code == LV_EVENT_PRESSING) {
         gesture_last_y_ = p.y;
-        if (assistant_active_ && shade_pull_ < 0.05f) return;
+        if (assistant_active_) return;
         const int dy = p.y - gesture_start_y_;
-        // Interactive pull: from top edge or while shade already open.
-        if (gesture_from_top_ && (shade_pull_ > 0.05f || dy > 8)) {
+        if (gesture_from_top_ && dy > 8) {
             shade_dragging_ = true;
-            float pull = shade_open_ ? (1.f + (float)dy / (float)shade_panel_h_)
-                                     : ((float)dy / (float)shade_panel_h_);
-            if (!shade_open_ && shade_pull_ < 0.05f && dy > 0) {
-                RefreshShade();
-            }
-            SetShadePull(pull);
+            if (shade_pull_ < 0.05f) RefreshShade();
+            SetShadePull((float)dy / (float)shade_panel_h_);
         }
         return;
     }
@@ -868,39 +962,22 @@ void ValeraLcdDisplay::OnGesture(lv_event_t* e) {
 
     if (shade_dragging_) {
         shade_dragging_ = false;
-        // Velocity-ish: if pulled past mid or flung open → commit.
-        const float commit = (shade_pull_ > 0.42f) || (dy > 90) ? 1.f : 0.f;
-        // Closing fling upward
-        const float close = (dy < -50 && shade_pull_ < 0.85f) ? 0.f : commit;
-        shade_target_ = (dy < -40) ? 0.f : close;
+        shade_target_ = (shade_pull_ > 0.42f || dy > 90) ? 1.f : 0.f;
         if (shade_target_ > 0.5f) RefreshShade();
-        return;
-    }
-
-    if (shade_pull_ > 0.85f) {
-        if (dy < -48 && ady > adx) {
-            ShowShade(false);
-            return;
-        }
-        if (adx < 22 && ady < 22) {
-            HandleShadeTap(p.x, p.y);
-        }
         return;
     }
 
     if (assistant_active_) return;
 
-    // Swipe down from upper area → open shade (spring)
     if (gesture_start_y_ < 160 && dy > 36 && ady > adx) {
         ShowShade(true);
         return;
     }
-    // Short tap near the top handle also opens shade.
     if (gesture_start_y_ < 56 && adx < 24 && ady < 24) {
         ShowShade(true);
         return;
     }
-    // Horizontal swipe ↔ idle pages (direction-aware)
+    // Horizontal swipe ↔ idle pages (Halo gallery scroll feel).
     if (adx > 56 && adx > ady * 1.2f) {
         if (dx < 0) AdvanceIdlePage();
         else RetreatIdlePage();
@@ -1405,44 +1482,65 @@ void ValeraLcdDisplay::PaintClock(const struct tm* tm, bool colon_on) {
         hh_c = lv_color_hex(0x7CFFB2);
         mm_c = lv_color_hex(0x5EEAD4);
     }
-    SetSegDigit(&clock_hh_[0], tm->tm_hour / 10, hh_c);
-    SetSegDigit(&clock_hh_[1], tm->tm_hour % 10, hh_c);
-    SetSegDigit(&clock_mm_[0], tm->tm_min / 10, mm_c);
-    SetSegDigit(&clock_mm_[1], tm->tm_min % 10, mm_c);
-    const lv_opa_t colon_opa = colon_on ? LV_OPA_COVER : LV_OPA_40;
+    const int h0 = tm->tm_hour / 10;
+    const int h1 = tm->tm_hour % 10;
+    const int m0 = tm->tm_min / 10;
+    const int m1 = tm->tm_min % 10;
+    // Only rewrite segments that changed — colon blink alone must stay cheap.
+    if (h0 != last_seg_hh_[0]) {
+        SetSegDigit(&clock_hh_[0], h0, hh_c);
+        last_seg_hh_[0] = h0;
+    }
+    if (h1 != last_seg_hh_[1]) {
+        SetSegDigit(&clock_hh_[1], h1, hh_c);
+        last_seg_hh_[1] = h1;
+    }
+    if (m0 != last_seg_mm_[0]) {
+        SetSegDigit(&clock_mm_[0], m0, mm_c);
+        last_seg_mm_[0] = m0;
+    }
+    if (m1 != last_seg_mm_[1]) {
+        SetSegDigit(&clock_mm_[1], m1, mm_c);
+        last_seg_mm_[1] = m1;
+    }
+    const lv_opa_t colon_opa = colon_on ? LV_OPA_COVER : LV_OPA_30;
     for (int i = 0; i < 2; ++i) {
-        if (clock_colon_[i]) lv_obj_set_style_bg_opa(clock_colon_[i], colon_opa, 0);
+        if (clock_colon_[i]) {
+            lv_obj_set_style_bg_color(clock_colon_[i], mm_c, 0);
+            lv_obj_set_style_bg_opa(clock_colon_[i], colon_opa, 0);
+        }
     }
 
     ValeraClimate c = ValeraSensors::Get();
     if (clock_edge_weather_) {
         if (c.outdoor_ok) {
-            char weather_line[48];
-            snprintf(weather_line, sizeof(weather_line), "%d° %s", (int)lroundf(c.outdoor_c),
+            char weather_line[32];
+            snprintf(weather_line, sizeof(weather_line), "%d° · %s", (int)lroundf(c.outdoor_c),
                      WeatherWord(c.weather_code));
             lv_label_set_text(clock_edge_weather_, weather_line);
+            if (clock_wx_pill_) lv_obj_clear_flag(clock_wx_pill_, LV_OBJ_FLAG_HIDDEN);
         } else {
-            lv_label_set_text(clock_edge_weather_, "");
+            lv_label_set_text(clock_edge_weather_, "—°");
+            if (clock_wx_pill_) lv_obj_clear_flag(clock_wx_pill_, LV_OBJ_FLAG_HIDDEN);
         }
     }
 
     if (clock_edge_date_) {
         const bool time_ok = c.time_ok || (tm->tm_year + 1900) >= 2024;
         if (!time_ok) {
-            lv_label_set_text(clock_edge_date_, "");
+            lv_label_set_text(clock_edge_date_, "синхр. времени…");
         } else {
-            char date_line[72];
-            snprintf(date_line, sizeof(date_line), "%s, %d %s", WeekdayFull(tm->tm_wday),
-                     tm->tm_mday, MonthFull(tm->tm_mon));
+            char date_line[24];
+            snprintf(date_line, sizeof(date_line), "%s  %d  %s", WeekdayShort(tm->tm_wday),
+                     tm->tm_mday, MonthShort(tm->tm_mon));
             lv_label_set_text(clock_edge_date_, date_line);
         }
     }
 
     if (activation_label_) {
-        if (activation_code_[0] != '\0' &&
-            Application::GetInstance().GetDeviceState() == kDeviceStateActivating) {
-            char buf[80];
-            snprintf(buf, sizeof(buf), "Код: %s\nвведите на xiaozhi.me", activation_code_);
+        if (!activation_bound_ && activation_code_[0] != '\0') {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "КОД  %s\nxiaozhi.me", activation_code_);
             lv_label_set_text(activation_label_, buf);
             lv_obj_clear_flag(activation_label_, LV_OBJ_FLAG_HIDDEN);
         } else {
@@ -1515,6 +1613,7 @@ void ValeraLcdDisplay::SetChatMessage(const char* role, const char* content) {
 
     const char* text = (content != nullptr) ? content : "";
     // Pull activation digits out of the system alert so they stay on the clock face.
+    // Empty system clears must NOT wipe a pending code (ActivationDone does that).
     if (role != nullptr && std::strcmp(role, "system") == 0 && text[0] != '\0') {
         char digits[16] = {};
         int n = 0;
@@ -1531,11 +1630,35 @@ void ValeraLcdDisplay::SetChatMessage(const char* role, const char* content) {
         if (n >= 4 && n <= 8) {
             std::strncpy(activation_code_, digits, sizeof(activation_code_) - 1);
             activation_code_[sizeof(activation_code_) - 1] = '\0';
+            activation_bound_ = false;
+            Settings s("valera", true);
+            s.SetString("act_code", activation_code_);
+            s.SetInt("act_bound", 0);
             last_hour_ = -1;  // force PaintClock to refresh activation banner
+            if (activation_label_) {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "КОД  %s\nxiaozhi.me", activation_code_);
+                lv_label_set_text(activation_label_, buf);
+                lv_obj_clear_flag(activation_label_, LV_OBJ_FLAG_HIDDEN);
+            }
+            ESP_LOGI(TAG, "Activation code on face: %s", activation_code_);
         }
     }
 
+    // Empty caption while idle — keep activation digits on the face unless bound.
     if (caption_label_ == nullptr) return;
+    if (text[0] == '\0' && !assistant_active_) {
+        Settings s("valera", false);
+        if (s.GetInt("act_bound", 0) != 0) {
+            activation_bound_ = true;
+            activation_code_[0] = '\0';
+            if (activation_label_) lv_obj_add_flag(activation_label_, LV_OBJ_FLAG_HIDDEN);
+        }
+        caption_text_[0] = '\0';
+        has_caption_ = false;
+        caption_dirty_ = false;
+        return;
+    }
     std::strncpy(caption_text_, text, sizeof(caption_text_) - 1);
     caption_text_[sizeof(caption_text_) - 1] = '\0';
 

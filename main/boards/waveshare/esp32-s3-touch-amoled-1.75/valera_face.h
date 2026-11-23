@@ -88,11 +88,14 @@ private:
     void AnimateShadeTick();
     void RefreshShade();
     void CycleTheme();
-    void HandleShadeTap(int16_t x, int16_t y);
+    void ApplyShadeRowAction(int row);
     void AdvanceIdlePage();
     void RetreatIdlePage();
     static void GestureEventCb(lv_event_t* e);
+    static void ShadeRowEventCb(lv_event_t* e);
+    static void ShadePanelEventCb(lv_event_t* e);
     void OnGesture(lv_event_t* e);
+    void OnShadePanelGesture(lv_event_t* e);
 
     void AnimateAmbient();
     void AnimateEyes(Eye* left, Eye* right, int16_t w, int16_t h, int16_t pupil_r, bool playful);
@@ -115,6 +118,7 @@ private:
     lv_obj_t* time_mm_label_ = nullptr;
     lv_obj_t* clock_edge_weather_ = nullptr;
     lv_obj_t* clock_edge_date_ = nullptr;
+    lv_obj_t* clock_wx_pill_ = nullptr;
     lv_obj_t* activation_label_ = nullptr;
     lv_obj_t* shade_grab_ = nullptr;
     lv_obj_t* clock_objs_[48] = {};
@@ -124,6 +128,9 @@ private:
     uint32_t clock_hh_color_ = 0xFFFFFF;
     uint32_t clock_mm_color_ = 0xFF8FA3;
     char activation_code_[16] = {};
+    bool activation_bound_ = false;
+    int last_seg_hh_[2] = {-1, -1};
+    int last_seg_mm_[2] = {-1, -1};
     bool boot_sound_played_ = false;
 
     // Weather: large readable labels (Popka-like).

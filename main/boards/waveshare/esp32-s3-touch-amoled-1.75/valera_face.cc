@@ -138,7 +138,7 @@ void ValeraLcdDisplay::SetupUI() {
     LoadClockStyle();
     BuildFace();
     face_ready_ = true;
-    timer_ = lv_timer_create(TickThunk, 16, this);
+    timer_ = lv_timer_create(TickThunk, 33, this);
     if (!boot_sound_played_) {
         boot_sound_played_ = true;
         Application::GetInstance().Schedule([]() {
@@ -332,13 +332,7 @@ void ValeraLcdDisplay::BuildFace() {
     lv_obj_set_style_bg_opa(root_, LV_OPA_COVER, 0);
 
     bezel_ = MakePlain(root_);
-    lv_obj_set_size(bezel_, min_side - 16, min_side - 16);
-    lv_obj_center(bezel_);
-    lv_obj_set_style_radius(bezel_, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_opa(bezel_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(bezel_, 2, 0);
-    lv_obj_set_style_border_color(bezel_, kCyanDim, 0);
-    lv_obj_set_style_border_opa(bezel_, LV_OPA_30, 0);
+    lv_obj_add_flag(bezel_, LV_OBJ_FLAG_HIDDEN);
 
     shade_grab_ = MakePlain(root_);
     lv_obj_set_size(shade_grab_, 140, 40);
@@ -403,22 +397,18 @@ void ValeraLcdDisplay::BuildFace() {
     lv_obj_align(clock_edge_date_, LV_ALIGN_TOP_MID, 0, (int)(min_side * 0.14f));
     Track(clock_objs_, &clock_obj_n_, 48, clock_edge_date_);
 
-    const int pill_w = (int)(min_side * 0.42f);
-    const int pill_h = (int)(min_side * 0.13f);
-    clock_wx_pill_ = MakePlain(root_);
-    lv_obj_set_size(clock_wx_pill_, pill_w, pill_h);
-    lv_obj_align(clock_wx_pill_, LV_ALIGN_CENTER, 0, (int)(min_side * 0.28f));
-    lv_obj_set_style_radius(clock_wx_pill_, pill_h / 2, 0);
-    lv_obj_set_style_bg_color(clock_wx_pill_, lv_color_hex(0x2D2F2F), 0);
-    lv_obj_set_style_bg_opa(clock_wx_pill_, LV_OPA_COVER, 0);
-    Track(clock_objs_, &clock_obj_n_, 48, clock_wx_pill_);
-
-    clock_edge_weather_ = lv_label_create(clock_wx_pill_);
-    lv_label_set_text(clock_edge_weather_, "—°");
-    lv_obj_set_style_text_color(clock_edge_weather_, kWhite, 0);
-    lv_obj_set_style_text_align(clock_edge_weather_, LV_TEXT_ALIGN_CENTER, 0);
-    if (font) lv_obj_set_style_text_font(clock_edge_weather_, font, 0);
-    lv_obj_center(clock_edge_weather_);
+    // Activation code banner (bottom of clock) — always visible until bound.
+    activation_banner_ = lv_label_create(root_);
+    lv_label_set_text(activation_banner_, "");
+    lv_obj_set_style_text_color(activation_banner_, kCyan, 0);
+    lv_obj_set_style_text_align(activation_banner_, LV_TEXT_ALIGN_CENTER, 0);
+    if (font) lv_obj_set_style_text_font(activation_banner_, font, 0);
+    lv_obj_set_width(activation_banner_, (int)(min_side * 0.78f));
+    lv_label_set_long_mode(activation_banner_, LV_LABEL_LONG_CLIP);
+    lv_obj_align(activation_banner_, LV_ALIGN_BOTTOM_MID, 0, -(int)(min_side * 0.14f));
+    lv_obj_add_flag(activation_banner_, LV_OBJ_FLAG_HIDDEN);
+    Track(clock_objs_, &clock_obj_n_, 48, activation_banner_);
+    PaintActivationBanner();
 
     // Weather page
     weather_glyph_ = MakePlain(root_);
@@ -531,6 +521,63 @@ void ValeraLcdDisplay::BuildFace() {
     next_blink_tick_ = 100 + (rand() % 120);
 }
 
+
+void ValeraLcdDisplay::ReloadActivationFromNvs() {
+    Settings s("valera", false);
+    activation_bound_ = s.GetInt("act_bound", 0) != 0;
+    std::string saved = s.GetString("act_code");
+    if (!saved.empty() && !activation_bound_) {
+        std::strncpy(activation_code_, saved.c_str(), sizeof(activation_code_) - 1);
+        activation_code_[sizeof(activation_code_) - 1] = '\0';
+    }
+}
+
+void ValeraLcdDisplay::PaintActivationBanner() {
+    if (!activation_banner_) return;
+    if (!activation_bound_ && activation_code_[0] != '\0') {
+        char buf[40];
+        snprintf(buf, sizeof(buf), "КОД  %s", activation_code_);
+        lv_label_set_text(activation_banner_, buf);
+        lv_obj_clear_flag(activation_banner_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_label_set_text(activation_banner_, "");
+        lv_obj_add_flag(activation_banner_, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void ValeraLcdDisplay::StationStep(int delta) {
+    if (kValeraRadioStationCount <= 0) return;
+    ValeraRadioPrefs::Load();
+    if (delta != 0) {
+        int idx = radio_station_idx_;
+        for (int n = 0; n < kValeraRadioStationCount; ++n) {
+            idx += delta;
+            while (idx < 0) idx += kValeraRadioStationCount;
+            while (idx >= kValeraRadioStationCount) idx -= kValeraRadioStationCount;
+            if (!ValeraRadioPrefs::IsHidden(idx)) {
+                radio_station_idx_ = idx;
+                break;
+            }
+        }
+    } else if (ValeraRadioPrefs::IsHidden(radio_station_idx_)) {
+        for (int i = 0; i < kValeraRadioStationCount; ++i) {
+            if (!ValeraRadioPrefs::IsHidden(i)) {
+                radio_station_idx_ = i;
+                break;
+            }
+        }
+    }
+    if (stations_name_ && radio_station_idx_ >= 0 && radio_station_idx_ < kValeraRadioStationCount) {
+        const auto& st = kValeraRadioStations[radio_station_idx_];
+        lv_label_set_text(stations_name_, st.name);
+        if (stations_meta_) {
+            char mbuf[48];
+            snprintf(mbuf, sizeof(mbuf), "%s  %d kbps", st.genre, st.kbps);
+            lv_label_set_text(stations_meta_, mbuf);
+        }
+    }
+}
+
 void ValeraLcdDisplay::BuildRadio() {
     const lv_font_t* font = FaceFont(current_theme_);
     const int min_side = LV_HOR_RES < LV_VER_RES ? LV_HOR_RES : LV_VER_RES;
@@ -572,7 +619,7 @@ void ValeraLcdDisplay::BuildRadio() {
     lv_obj_set_user_data(radio_play_btn_, (void*)(intptr_t)50);
     lv_obj_add_event_cb(radio_play_btn_, RadioBtnEventCb, LV_EVENT_CLICKED, this);
     lv_obj_t* pl = lv_label_create(radio_play_btn_);
-    lv_label_set_text(pl, "▶  Эфир");
+    lv_label_set_text(pl, "Эфир");
     lv_obj_set_style_text_color(pl, kWhite, 0);
     if (font) lv_obj_set_style_text_font(pl, font, 0);
     lv_obj_center(pl);
@@ -593,78 +640,90 @@ void ValeraLcdDisplay::BuildRadio() {
 void ValeraLcdDisplay::BuildStations() {
     const lv_font_t* font = FaceFont(current_theme_);
     const int min_side = LV_HOR_RES < LV_VER_RES ? LV_HOR_RES : LV_VER_RES;
-    const int list_w = (int)(min_side * 0.82f);
-    const int list_h = (int)(min_side * 0.62f);
-    const int row_h = 56;
+    const int text_w = (int)(min_side * 0.70f);
 
     stations_title_ = lv_label_create(root_);
-    lv_label_set_text(stations_title_, "Станции RU");
+    lv_label_set_text(stations_title_, "Станции");
     lv_obj_set_style_text_color(stations_title_, kWhite, 0);
     lv_obj_set_style_text_align(stations_title_, LV_TEXT_ALIGN_CENTER, 0);
     if (font) lv_obj_set_style_text_font(stations_title_, font, 0);
-    lv_obj_align(stations_title_, LV_ALIGN_TOP_MID, 0, (int)(min_side * 0.10f));
-    Track(stations_objs_, &stations_obj_n_, 12, stations_title_);
+    lv_obj_align(stations_title_, LV_ALIGN_TOP_MID, 0, (int)(min_side * 0.14f));
+    Track(stations_objs_, &stations_obj_n_, 16, stations_title_);
 
-    stations_list_ = MakePlain(root_);
-    lv_obj_set_size(stations_list_, list_w, list_h);
-    lv_obj_align(stations_list_, LV_ALIGN_CENTER, 0, (int)(min_side * 0.06f));
-    lv_obj_add_flag(stations_list_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_scroll_dir(stations_list_, LV_DIR_VER);
-    lv_obj_set_scrollbar_mode(stations_list_, LV_SCROLLBAR_MODE_OFF);
-    Track(stations_objs_, &stations_obj_n_, 12, stations_list_);
+    stations_name_ = lv_label_create(root_);
+    lv_label_set_text(stations_name_, "—");
+    lv_obj_set_width(stations_name_, text_w);
+    lv_label_set_long_mode(stations_name_, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_color(stations_name_, kCyan, 0);
+    lv_obj_set_style_text_align(stations_name_, LV_TEXT_ALIGN_CENTER, 0);
+    if (font) lv_obj_set_style_text_font(stations_name_, font, 0);
+    lv_obj_align(stations_name_, LV_ALIGN_CENTER, 0, -36);
+    Track(stations_objs_, &stations_obj_n_, 16, stations_name_);
 
-    ValeraRadioPrefs::Load();
-    int row = 0;
-    for (int i = 0; i < kValeraRadioStationCount && row < kStationRowMax; ++i) {
-        if (ValeraRadioPrefs::IsHidden(i)) continue;
-        stations_rows_[row] = MakeBtn(stations_list_, list_w - 8, row_h);
-        lv_obj_set_pos(stations_rows_[row], 4, row * (row_h + 8));
-        lv_obj_set_style_bg_color(stations_rows_[row], lv_color_hex(kValeraRadioStations[i].color),
-                                  0);
-        lv_obj_set_style_bg_opa(stations_rows_[row], LV_OPA_40, 0);
-        lv_obj_set_user_data(stations_rows_[row], (void*)(intptr_t)i);
-        lv_obj_add_event_cb(stations_rows_[row], StationRowEventCb, LV_EVENT_CLICKED, this);
+    stations_meta_ = lv_label_create(root_);
+    lv_label_set_text(stations_meta_, "");
+    lv_obj_set_width(stations_meta_, text_w);
+    lv_label_set_long_mode(stations_meta_, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_color(stations_meta_, kEdge, 0);
+    lv_obj_set_style_text_align(stations_meta_, LV_TEXT_ALIGN_CENTER, 0);
+    if (font) lv_obj_set_style_text_font(stations_meta_, font, 0);
+    lv_obj_align(stations_meta_, LV_ALIGN_CENTER, 0, 24);
+    Track(stations_objs_, &stations_obj_n_, 16, stations_meta_);
 
-        lv_obj_t* name = lv_label_create(stations_rows_[row]);
-        lv_label_set_text(name, kValeraRadioStations[i].name);
-        lv_obj_set_style_text_color(name, kWhite, 0);
-        if (font) lv_obj_set_style_text_font(name, font, 0);
-        lv_obj_align(name, LV_ALIGN_LEFT_MID, 16, -8);
+    const int btn = 56;
+    stations_prev_ = MakeBtn(root_, btn, btn);
+    lv_obj_align(stations_prev_, LV_ALIGN_CENTER, -(int)(min_side * 0.32f), (int)(min_side * 0.22f));
+    lv_obj_set_user_data(stations_prev_, (void*)(intptr_t)60);
+    lv_obj_add_event_cb(stations_prev_, StationRowEventCb, LV_EVENT_CLICKED, this);
+    lv_obj_t* pl = lv_label_create(stations_prev_);
+    lv_label_set_text(pl, "<");
+    lv_obj_set_style_text_color(pl, kWhite, 0);
+    if (font) lv_obj_set_style_text_font(pl, font, 0);
+    lv_obj_center(pl);
+    Track(stations_objs_, &stations_obj_n_, 16, stations_prev_);
 
-        lv_obj_t* meta = lv_label_create(stations_rows_[row]);
-        char mbuf[40];
-        snprintf(mbuf, sizeof(mbuf), "%s · %d kbps", kValeraRadioStations[i].genre,
-                 kValeraRadioStations[i].kbps);
-        lv_label_set_text(meta, mbuf);
-        lv_obj_set_style_text_color(meta, kEdge, 0);
-        if (font) lv_obj_set_style_text_font(meta, font, 0);
-        lv_obj_align(meta, LV_ALIGN_LEFT_MID, 16, 12);
-        ++row;
-    }
+    stations_next_ = MakeBtn(root_, btn, btn);
+    lv_obj_align(stations_next_, LV_ALIGN_CENTER, (int)(min_side * 0.32f), (int)(min_side * 0.22f));
+    lv_obj_set_user_data(stations_next_, (void*)(intptr_t)61);
+    lv_obj_add_event_cb(stations_next_, StationRowEventCb, LV_EVENT_CLICKED, this);
+    lv_obj_t* nl = lv_label_create(stations_next_);
+    lv_label_set_text(nl, ">");
+    lv_obj_set_style_text_color(nl, kWhite, 0);
+    if (font) lv_obj_set_style_text_font(nl, font, 0);
+    lv_obj_center(nl);
+    Track(stations_objs_, &stations_obj_n_, 16, stations_next_);
+
+    stations_pick_ = MakeBtn(root_, (int)(min_side * 0.40f), 52);
+    lv_obj_align(stations_pick_, LV_ALIGN_CENTER, 0, (int)(min_side * 0.22f));
+    lv_obj_set_user_data(stations_pick_, (void*)(intptr_t)62);
+    lv_obj_add_event_cb(stations_pick_, StationRowEventCb, LV_EVENT_CLICKED, this);
+    lv_obj_t* pk = lv_label_create(stations_pick_);
+    lv_label_set_text(pk, "Выбрать");
+    lv_obj_set_style_text_color(pk, kWhite, 0);
+    if (font) lv_obj_set_style_text_font(pk, font, 0);
+    lv_obj_center(pk);
+    Track(stations_objs_, &stations_obj_n_, 16, stations_pick_);
 }
 
 void ValeraLcdDisplay::BuildShade() {
     const lv_font_t* font = FaceFont(current_theme_);
-    shade_panel_h_ = (int)(LV_VER_RES * 0.72f);
-    const int row_w = (int)(LV_HOR_RES * 0.78f);
-    const int btn = 52;
+    const int row_w = (int)(LV_HOR_RES * 0.72f);
+    const int btn = 48;
 
+    shade_panel_h_ = (int)(LV_VER_RES * 0.58f);
     shade_panel_ = MakePlain(root_);
     lv_obj_set_size(shade_panel_, LV_HOR_RES, shade_panel_h_);
-    lv_obj_set_pos(shade_panel_, 0, -shade_panel_h_);
-    lv_obj_set_style_radius(shade_panel_, 28, 0);
-    lv_obj_set_style_bg_color(shade_panel_, lv_color_hex(0x10161E), 0);
+    lv_obj_set_style_bg_color(shade_panel_, lv_color_hex(0x12161C), 0);
     lv_obj_set_style_bg_opa(shade_panel_, LV_OPA_COVER, 0);
     lv_obj_add_flag(shade_panel_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(shade_panel_, LV_OBJ_FLAG_HIDDEN);
-    // Drag-close on empty panel area (buttons keep their own CLICKED).
     lv_obj_add_event_cb(shade_panel_, GestureEventCb, LV_EVENT_PRESSED, this);
     lv_obj_add_event_cb(shade_panel_, GestureEventCb, LV_EVENT_PRESSING, this);
     lv_obj_add_event_cb(shade_panel_, GestureEventCb, LV_EVENT_RELEASED, this);
 
     shade_handle_ = MakePlain(shade_panel_);
-    lv_obj_set_size(shade_handle_, 64, 6);
-    lv_obj_align(shade_handle_, LV_ALIGN_TOP_MID, 0, 14);
+    lv_obj_set_size(shade_handle_, 56, 5);
+    lv_obj_align(shade_handle_, LV_ALIGN_TOP_MID, 0, 12);
     lv_obj_set_style_radius(shade_handle_, 3, 0);
     lv_obj_set_style_bg_color(shade_handle_, lv_color_hex(0x6a7a90), 0);
     lv_obj_set_style_bg_opa(shade_handle_, LV_OPA_COVER, 0);
@@ -673,7 +732,7 @@ void ValeraLcdDisplay::BuildShade() {
     lv_label_set_text(shade_title_, "Управление");
     lv_obj_set_style_text_color(shade_title_, kWhite, 0);
     if (font) lv_obj_set_style_text_font(shade_title_, font, 0);
-    lv_obj_align(shade_title_, LV_ALIGN_TOP_MID, 0, 32);
+    lv_obj_align(shade_title_, LV_ALIGN_TOP_MID, 0, 28);
 
     auto make_pm = [&](lv_obj_t** minus, lv_obj_t** plus, lv_obj_t** val, const char* title, int y,
                        int id_base) {
@@ -688,20 +747,20 @@ void ValeraLcdDisplay::BuildShade() {
         lv_obj_align(lab, LV_ALIGN_LEFT_MID, 0, 0);
 
         *minus = MakeBtn(row, btn, btn);
-        lv_obj_align(*minus, LV_ALIGN_RIGHT_MID, -(btn * 2 + 8), 0);
+        lv_obj_align(*minus, LV_ALIGN_RIGHT_MID, -(btn * 2 + 10), 0);
         lv_obj_set_user_data(*minus, (void*)(intptr_t)id_base);
         lv_obj_add_event_cb(*minus, ShadeBtnEventCb, LV_EVENT_CLICKED, this);
         lv_obj_t* ml = lv_label_create(*minus);
-        lv_label_set_text(ml, "−");
+        lv_label_set_text(ml, "-");
         lv_obj_set_style_text_color(ml, kWhite, 0);
         if (font) lv_obj_set_style_text_font(ml, font, 0);
         lv_obj_center(ml);
 
         *val = lv_label_create(row);
-        lv_label_set_text(*val, "—");
+        lv_label_set_text(*val, "--");
         lv_obj_set_style_text_color(*val, kWhite, 0);
         if (font) lv_obj_set_style_text_font(*val, font, 0);
-        lv_obj_align(*val, LV_ALIGN_RIGHT_MID, -(btn + 12), 0);
+        lv_obj_align(*val, LV_ALIGN_RIGHT_MID, -(btn + 14), 0);
 
         *plus = MakeBtn(row, btn, btn);
         lv_obj_align(*plus, LV_ALIGN_RIGHT_MID, 0, 0);
@@ -714,52 +773,23 @@ void ValeraLcdDisplay::BuildShade() {
         lv_obj_center(pl);
     };
 
-    make_pm(&shade_bri_minus_, &shade_bri_plus_, &shade_bri_val_, "Яркость", 78, 10);
-    make_pm(&shade_vol_minus_, &shade_vol_plus_, &shade_vol_val_, "Громкость", 78 + 64, 20);
+    make_pm(&shade_bri_minus_, &shade_bri_plus_, &shade_bri_val_, "Яркость", 70, 10);
+    make_pm(&shade_vol_minus_, &shade_vol_plus_, &shade_vol_val_, "Громкость", 70 + 58, 20);
 
     shade_settings_btn_ = MakeBtn(shade_panel_, row_w, btn);
-    lv_obj_align(shade_settings_btn_, LV_ALIGN_TOP_MID, 0, 78 + 64 * 2);
+    lv_obj_align(shade_settings_btn_, LV_ALIGN_TOP_MID, 0, 70 + 58 * 2);
     lv_obj_set_user_data(shade_settings_btn_, (void*)(intptr_t)30);
     lv_obj_add_event_cb(shade_settings_btn_, ShadeBtnEventCb, LV_EVENT_CLICKED, this);
     lv_obj_t* sl = lv_label_create(shade_settings_btn_);
-    lv_label_set_text(sl, "Настройки  ›");
-    lv_obj_set_style_text_color(sl, kWhite, 0);
+    lv_label_set_text(sl, "Настройки / код");
+    lv_obj_set_style_text_color(sl, kCyan, 0);
     if (font) lv_obj_set_style_text_font(sl, font, 0);
     lv_obj_center(sl);
 
-    shade_radio_btn_ = MakeBtn(shade_panel_, row_w, btn);
-    lv_obj_align(shade_radio_btn_, LV_ALIGN_TOP_MID, 0, 78 + 64 * 3);
-    lv_obj_set_user_data(shade_radio_btn_, (void*)(intptr_t)33);
-    lv_obj_add_event_cb(shade_radio_btn_, ShadeBtnEventCb, LV_EVENT_CLICKED, this);
-    lv_obj_t* rl = lv_label_create(shade_radio_btn_);
-    lv_label_set_text(rl, "Радио  ›");
-    lv_obj_set_style_text_color(rl, kCyan, 0);
-    if (font) lv_obj_set_style_text_font(rl, font, 0);
-    lv_obj_center(rl);
-
-    shade_theme_btn_ = MakeBtn(shade_panel_, row_w, btn);
-    lv_obj_align(shade_theme_btn_, LV_ALIGN_TOP_MID, 0, 78 + 64 * 4);
-    lv_obj_set_user_data(shade_theme_btn_, (void*)(intptr_t)31);
-    lv_obj_add_event_cb(shade_theme_btn_, ShadeBtnEventCb, LV_EVENT_CLICKED, this);
-    lv_obj_t* tl = lv_label_create(shade_theme_btn_);
-    lv_label_set_text(tl, "Тема часов");
-    lv_obj_set_style_text_color(tl, kWhite, 0);
-    if (font) lv_obj_set_style_text_font(tl, font, 0);
-    lv_obj_center(tl);
-
-    shade_wifi_btn_ = MakeBtn(shade_panel_, row_w, btn);
-    lv_obj_align(shade_wifi_btn_, LV_ALIGN_TOP_MID, 0, 78 + 64 * 5);
-    lv_obj_set_user_data(shade_wifi_btn_, (void*)(intptr_t)32);
-    lv_obj_add_event_cb(shade_wifi_btn_, ShadeBtnEventCb, LV_EVENT_CLICKED, this);
-    lv_obj_t* wl = lv_label_create(shade_wifi_btn_);
-    lv_label_set_text(wl, "Сброс Wi‑Fi");
-    lv_obj_set_style_text_color(wl, kOrange, 0);
-    if (font) lv_obj_set_style_text_font(wl, font, 0);
-    lv_obj_center(wl);
-
-    // Taller shade so all rows fit.
-    shade_panel_h_ = (int)(LV_VER_RES * 0.88f);
-    lv_obj_set_height(shade_panel_, shade_panel_h_);
+    // Keep pointers null — theme/wifi/radio removed from shade to cut clutter & reboot traps.
+    shade_radio_btn_ = nullptr;
+    shade_theme_btn_ = nullptr;
+    shade_wifi_btn_ = nullptr;
 
     SetShadePull(0.f);
 }
@@ -769,60 +799,60 @@ void ValeraLcdDisplay::BuildSettings() {
     settings_panel_ = MakePlain(root_);
     lv_obj_set_size(settings_panel_, LV_HOR_RES, LV_VER_RES);
     lv_obj_set_pos(settings_panel_, 0, 0);
-    lv_obj_set_style_bg_color(settings_panel_, lv_color_hex(0x0A0E14), 0);
+    lv_obj_set_style_bg_color(settings_panel_, lv_color_hex(0x070A0F), 0);
     lv_obj_set_style_bg_opa(settings_panel_, LV_OPA_COVER, 0);
     lv_obj_add_flag(settings_panel_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(settings_panel_, LV_OBJ_FLAG_HIDDEN);
 
     settings_title_ = lv_label_create(settings_panel_);
-    lv_label_set_text(settings_title_, "Настройки");
-    lv_obj_set_style_text_color(settings_title_, kWhite, 0);
+    lv_label_set_text(settings_title_, "Код активации");
+    lv_obj_set_style_text_color(settings_title_, kEdge, 0);
     if (font) lv_obj_set_style_text_font(settings_title_, font, 0);
-    lv_obj_align(settings_title_, LV_ALIGN_TOP_MID, 0, (int)(LV_VER_RES * 0.12f));
+    lv_obj_align(settings_title_, LV_ALIGN_TOP_MID, 0, (int)(LV_VER_RES * 0.16f));
 
     settings_code_ = lv_label_create(settings_panel_);
-    lv_label_set_text(settings_code_, "Код: —");
+    lv_label_set_text(settings_code_, "----");
     lv_obj_set_style_text_color(settings_code_, kCyan, 0);
     lv_obj_set_style_text_align(settings_code_, LV_TEXT_ALIGN_CENTER, 0);
     if (font) lv_obj_set_style_text_font(settings_code_, font, 0);
-    lv_obj_set_width(settings_code_, (int)(LV_HOR_RES * 0.72f));
+    lv_obj_set_width(settings_code_, (int)(LV_HOR_RES * 0.80f));
     lv_label_set_long_mode(settings_code_, LV_LABEL_LONG_WRAP);
-    lv_obj_align(settings_code_, LV_ALIGN_CENTER, 0, -40);
+    lv_obj_align(settings_code_, LV_ALIGN_CENTER, 0, -30);
 
     settings_wifi_ = lv_label_create(settings_panel_);
-    lv_label_set_text(settings_wifi_, "Wi‑Fi: MyWiFi");
+    lv_label_set_text(settings_wifi_, "Wi-Fi: MyWiFi");
     lv_obj_set_style_text_color(settings_wifi_, kEdge, 0);
     lv_obj_set_style_text_align(settings_wifi_, LV_TEXT_ALIGN_CENTER, 0);
     if (font) lv_obj_set_style_text_font(settings_wifi_, font, 0);
     lv_obj_set_width(settings_wifi_, (int)(LV_HOR_RES * 0.72f));
     lv_label_set_long_mode(settings_wifi_, LV_LABEL_LONG_WRAP);
-    lv_obj_align(settings_wifi_, LV_ALIGN_CENTER, 0, 40);
+    lv_obj_align(settings_wifi_, LV_ALIGN_CENTER, 0, 50);
 
     settings_hint_ = lv_label_create(settings_panel_);
-    lv_label_set_text(settings_hint_, "Введите код на\nxiaozhi.me");
-    lv_obj_set_style_text_color(settings_hint_, kEdge, 0);
+    lv_label_set_text(settings_hint_, "xiaozhi.me");
+    lv_obj_set_style_text_color(settings_hint_, kMagenta, 0);
     lv_obj_set_style_text_align(settings_hint_, LV_TEXT_ALIGN_CENTER, 0);
     if (font) lv_obj_set_style_text_font(settings_hint_, font, 0);
     lv_obj_set_width(settings_hint_, (int)(LV_HOR_RES * 0.70f));
     lv_label_set_long_mode(settings_hint_, LV_LABEL_LONG_WRAP);
     lv_obj_align(settings_hint_, LV_ALIGN_CENTER, 0, 90);
 
-    settings_radio_btn_ = MakeBtn(settings_panel_, (int)(LV_HOR_RES * 0.55f), 52);
-    lv_obj_align(settings_radio_btn_, LV_ALIGN_CENTER, 0, (int)(LV_VER_RES * 0.22f));
+    settings_radio_btn_ = MakeBtn(settings_panel_, (int)(LV_HOR_RES * 0.55f), 48);
+    lv_obj_align(settings_radio_btn_, LV_ALIGN_BOTTOM_MID, 0, -100);
     lv_obj_set_user_data(settings_radio_btn_, (void*)(intptr_t)41);
     lv_obj_add_event_cb(settings_radio_btn_, SettingsBtnEventCb, LV_EVENT_CLICKED, this);
-    lv_obj_t* rbl = lv_label_create(settings_radio_btn_);
-    lv_label_set_text(rbl, "Радио / Станции");
-    lv_obj_set_style_text_color(rbl, kCyan, 0);
-    if (font) lv_obj_set_style_text_font(rbl, font, 0);
-    lv_obj_center(rbl);
+    lv_obj_t* rl = lv_label_create(settings_radio_btn_);
+    lv_label_set_text(rl, "Станции");
+    lv_obj_set_style_text_color(rl, kWhite, 0);
+    if (font) lv_obj_set_style_text_font(rl, font, 0);
+    lv_obj_center(rl);
 
-    settings_back_ = MakeBtn(settings_panel_, (int)(LV_HOR_RES * 0.50f), 52);
-    lv_obj_align(settings_back_, LV_ALIGN_BOTTOM_MID, 0, -(int)(LV_VER_RES * 0.10f));
+    settings_back_ = MakeBtn(settings_panel_, (int)(LV_HOR_RES * 0.50f), 48);
+    lv_obj_align(settings_back_, LV_ALIGN_BOTTOM_MID, 0, -40);
     lv_obj_set_user_data(settings_back_, (void*)(intptr_t)40);
     lv_obj_add_event_cb(settings_back_, SettingsBtnEventCb, LV_EVENT_CLICKED, this);
     lv_obj_t* bl = lv_label_create(settings_back_);
-    lv_label_set_text(bl, "‹  Назад");
+    lv_label_set_text(bl, "Назад");
     lv_obj_set_style_text_color(bl, kWhite, 0);
     if (font) lv_obj_set_style_text_font(bl, font, 0);
     lv_obj_center(bl);
@@ -871,6 +901,7 @@ void ValeraLcdDisplay::ShowSettings(bool open) {
     if (!settings_panel_) return;
     if (open) {
         ShowShade(false);
+        ReloadActivationFromNvs();
         RefreshSettings();
         lv_obj_clear_flag(settings_panel_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_move_foreground(settings_panel_);
@@ -926,31 +957,24 @@ void ValeraLcdDisplay::RefreshShade() {
 }
 
 void ValeraLcdDisplay::RefreshSettings() {
+    ReloadActivationFromNvs();
     if (settings_code_) {
         if (!activation_bound_ && activation_code_[0] != '\0') {
             char buf[48];
-            snprintf(buf, sizeof(buf), "КОД\n%s", activation_code_);
+            snprintf(buf, sizeof(buf), "%s", activation_code_);
             lv_label_set_text(settings_code_, buf);
         } else if (activation_bound_) {
-            lv_label_set_text(settings_code_, "Привязано\nк xiaozhi.me");
+            lv_label_set_text(settings_code_, "OK");
+            if (settings_hint_) lv_label_set_text(settings_hint_, "Уже привязано");
         } else {
-            lv_label_set_text(settings_code_, "Код ещё не\nпришёл — ждите\nили проверьте сеть");
+            lv_label_set_text(settings_code_, "....");
+            if (settings_hint_) lv_label_set_text(settings_hint_, "Ждём код с сервера");
         }
     }
     if (settings_wifi_) {
-        auto& wifi = WifiManager::GetInstance();
-        char line[96];
-        if (wifi.IsConnected()) {
-            std::string ssid = wifi.GetSsid();
-            if (ssid.empty()) ssid = "MyWiFi";
-            snprintf(line, sizeof(line), "Wi‑Fi: %s", ssid.c_str());
-        } else if (wifi.IsConfigMode()) {
-            snprintf(line, sizeof(line), "Wi‑Fi: точка доступа");
-        } else {
-            snprintf(line, sizeof(line), "Wi‑Fi: подключение…\nMyWiFi");
-        }
-        lv_label_set_text(settings_wifi_, line);
+        lv_label_set_text(settings_wifi_, "Wi-Fi: MyWiFi");
     }
+    PaintActivationBanner();
 }
 
 void ValeraLcdDisplay::CycleTheme() {
@@ -972,17 +996,6 @@ void ValeraLcdDisplay::OnShadeBtn(lv_event_t* e) {
     else if (id == 20) NudgeVolume(-10);
     else if (id == 21) NudgeVolume(+10);
     else if (id == 30) ShowSettings(true);
-    else if (id == 31) CycleTheme();
-    else if (id == 32) {
-        ShowShade(false);
-        Application::GetInstance().Schedule([]() {
-            auto* wifi = static_cast<WifiBoard*>(&Board::GetInstance());
-            wifi->EnterWifiConfigMode();
-        });
-    } else if (id == 33) {
-        ShowShade(false);
-        OpenRadio();
-    }
 }
 
 void ValeraLcdDisplay::SettingsBtnEventCb(lv_event_t* e) {
@@ -1028,8 +1041,10 @@ void ValeraLcdDisplay::StationRowEventCb(lv_event_t* e) {
 void ValeraLcdDisplay::OnStationRow(lv_event_t* e) {
     if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
     lv_obj_t* t = (lv_obj_t*)lv_event_get_target(e);
-    const int idx = (int)(intptr_t)lv_obj_get_user_data(t);
-    SelectStation(idx);
+    const int id = (int)(intptr_t)lv_obj_get_user_data(t);
+    if (id == 60) StationStep(-1);
+    else if (id == 61) StationStep(+1);
+    else if (id == 62) SelectStation(radio_station_idx_);
 }
 
 void ValeraLcdDisplay::OpenRadio() {
@@ -1187,10 +1202,11 @@ void ValeraLcdDisplay::ShowIdlePage(IdlePage page) {
     if (page == IdlePage::kClock) {
         last_hour_ = -1;
         last_min_ = -1;
+        PaintActivationBanner();
     }
     if (page == IdlePage::kRadio) PaintRadio();
-    if (page == IdlePage::kStations && stations_list_) {
-        lv_obj_scroll_to_y(stations_list_, 0, LV_ANIM_OFF);
+    if (page == IdlePage::kStations) {
+        StationStep(0);  // refresh card for current index
     }
 }
 
@@ -1509,7 +1525,7 @@ void ValeraLcdDisplay::PaintClock(const struct tm* tm, bool colon_on) {
     }
 
     ValeraClimate c = ValeraSensors::Get();
-    if (clock_edge_weather_) {
+    if (false && clock_edge_weather_) {
         if (c.outdoor_ok) {
             char weather_line[32];
             snprintf(weather_line, sizeof(weather_line), "%d° · %s", (int)lroundf(c.outdoor_c),
@@ -1565,8 +1581,35 @@ void ValeraLcdDisplay::PaintWeather() {
 }
 
 void ValeraLcdDisplay::SetStatus(const char* status) {
-    (void)status;
+    DisplayLockGuard lock(this);
     HideStockChrome();
+    if (!face_ready_) return;
+    // Catch activation status / any digit run in status text.
+    if (status && status[0]) {
+        char digits[16] = {};
+        int n = 0;
+        for (const char* p = status; *p && n < 15; ++p) {
+            if (*p >= '0' && *p <= '9') {
+                digits[n++] = *p;
+            } else if (n >= 4) {
+                break;
+            } else {
+                n = 0;
+            }
+        }
+        digits[n] = '\0';
+        if (n >= 4 && n <= 8) {
+            std::strncpy(activation_code_, digits, sizeof(activation_code_) - 1);
+            activation_code_[sizeof(activation_code_) - 1] = '\0';
+            activation_bound_ = false;
+            Settings s("valera", true);
+            s.SetString("act_code", activation_code_);
+            s.SetInt("act_bound", 0);
+        }
+    }
+    ReloadActivationFromNvs();
+    if (settings_open_) RefreshSettings();
+    else PaintActivationBanner();
 }
 
 void ValeraLcdDisplay::ShowNotification(const char* notification, int duration_ms) {
@@ -1588,11 +1631,11 @@ void ValeraLcdDisplay::SetChatMessage(const char* role, const char* content) {
     DisplayLockGuard lock(this);
     if (!face_ready_) return;
 
-    const char* text = (content != nullptr) ? content : "";
-    if (role != nullptr && std::strcmp(role, "system") == 0 && text[0] != '\0') {
+    const char* text_in = (content != nullptr) ? content : "";
+    if (role != nullptr && std::strcmp(role, "system") == 0 && text_in[0] != '\0') {
         char digits[16] = {};
         int n = 0;
-        for (const char* p = text; *p && n < 15; ++p) {
+        for (const char* p = text_in; *p && n < 15; ++p) {
             if (*p >= '0' && *p <= '9') {
                 digits[n++] = *p;
             } else if (n >= 4) {
@@ -1610,23 +1653,23 @@ void ValeraLcdDisplay::SetChatMessage(const char* role, const char* content) {
             s.SetString("act_code", activation_code_);
             s.SetInt("act_bound", 0);
             ESP_LOGI(TAG, "Activation code saved: %s", activation_code_);
+            PaintActivationBanner();
             if (settings_open_) RefreshSettings();
         }
     }
 
     if (caption_label_ == nullptr) return;
-    if (text[0] == '\0' && !assistant_active_) {
-        Settings s("valera", false);
-        if (s.GetInt("act_bound", 0) != 0) {
-            activation_bound_ = true;
-            activation_code_[0] = '\0';
-        }
+    if (text_in[0] == '\0' && !assistant_active_) {
+        // Do NOT wipe a pending activation code when alerts dismiss.
+        ReloadActivationFromNvs();
+        PaintActivationBanner();
         caption_text_[0] = '\0';
         has_caption_ = false;
         caption_dirty_ = false;
+        if (caption_label_) lv_label_set_text(caption_label_, "");
         return;
     }
-    std::strncpy(caption_text_, text, sizeof(caption_text_) - 1);
+    std::strncpy(caption_text_, text_in, sizeof(caption_text_) - 1);
     caption_text_[sizeof(caption_text_) - 1] = '\0';
 
     lv_color_t color = kWhite;

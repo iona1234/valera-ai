@@ -6,7 +6,8 @@
 
 // Valera round face (466×466) — HaloWatch-inspired, LVGL + XiaoZhi.
 // Idle carousel (swipe): Clock ↔ Weather ↔ Radio ↔ Stations.
-// Shade: brightness ±, volume ±, Radio, Settings (activation code).
+// Stations = one-card carousel (◀ ▶), not a dense scroll list.
+// Shade: brightness ±, volume ±, Settings (activation code big).
 // Listen/speak: eyes + EQ bars only. No floating orbs.
 class ValeraLcdDisplay : public SpiLcdDisplay {
 public:
@@ -37,7 +38,7 @@ private:
     enum class IdlePage { kClock, kWeather, kRadio, kStations };
 
     static constexpr int kSpectrumN = 11;
-    static constexpr int kStationRowMax = 24;
+    // Stations page uses a single card + prev/next (no row array).
 
     struct Eye {
         lv_obj_t* body = nullptr;
@@ -85,6 +86,9 @@ private:
     void ShowSettings(bool open);
     void OpenRadio();
     void OpenStations();
+    void StationStep(int delta);
+    void PaintActivationBanner();
+    void ReloadActivationFromNvs();
     void SelectStation(int index);
     void SetShadePull(float pull);
     void AnimateShadeTick();
@@ -192,6 +196,7 @@ private:
     lv_obj_t* settings_panel_ = nullptr;
     lv_obj_t* settings_title_ = nullptr;
     lv_obj_t* settings_code_ = nullptr;
+    lv_obj_t* activation_banner_ = nullptr;
     lv_obj_t* settings_wifi_ = nullptr;
     lv_obj_t* settings_hint_ = nullptr;
     lv_obj_t* settings_radio_btn_ = nullptr;
@@ -211,9 +216,12 @@ private:
     bool radio_playing_ = false;
 
     lv_obj_t* stations_title_ = nullptr;
-    lv_obj_t* stations_list_ = nullptr;
-    lv_obj_t* stations_rows_[kStationRowMax] = {};
-    lv_obj_t* stations_objs_[12] = {};
+    lv_obj_t* stations_name_ = nullptr;
+    lv_obj_t* stations_meta_ = nullptr;
+    lv_obj_t* stations_prev_ = nullptr;
+    lv_obj_t* stations_next_ = nullptr;
+    lv_obj_t* stations_pick_ = nullptr;
+    lv_obj_t* stations_objs_[16] = {};
     int stations_obj_n_ = 0;
 
     bool gesture_tracking_ = false;

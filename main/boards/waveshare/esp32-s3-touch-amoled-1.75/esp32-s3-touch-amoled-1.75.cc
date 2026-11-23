@@ -503,10 +503,14 @@ public:
     }
 
     virtual void SetPowerSaveLevel(PowerSaveLevel level) override {
-        if (level != PowerSaveLevel::LOW_POWER) {
+        // Valera desk use: never enter Wi-Fi LOW_POWER — it looked like
+        // cyclic reconnect / reboot while navigating the face UI.
+        (void)level;
+        if (power_save_timer_) {
             power_save_timer_->WakeUp();
+            power_save_timer_->SetEnabled(false);
         }
-        WifiBoard::SetPowerSaveLevel(level);
+        WifiBoard::SetPowerSaveLevel(PowerSaveLevel::PERFORMANCE);
     }
 };
 
